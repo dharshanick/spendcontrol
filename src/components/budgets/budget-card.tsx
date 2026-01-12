@@ -58,21 +58,21 @@ export default function BudgetCard({ budget, onDelete }: BudgetCardProps) {
           <div>
             <CardTitle className="text-lg">{name} Budget</CardTitle>
             <CardDescription className="flex items-center gap-2 pt-1">
-                <CalendarDays className="h-4 w-4" />
-                {format(startDate, "MMM d")} - {format(endDate, "MMM d, yyyy")}
+              <CalendarDays className="h-4 w-4" />
+              {format(startDate, "MMM d")} - {format(endDate, "MMM d, yyyy")}
             </CardDescription>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreVertical className="h-4 w-4"/>
-                </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                </DropdownMenuItem>
+              <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -80,9 +80,9 @@ export default function BudgetCard({ budget, onDelete }: BudgetCardProps) {
       <CardContent className="flex flex-col flex-grow justify-between">
         <div>
           <div className="flex items-baseline gap-2 mb-2">
-            <span className="text-3xl font-bold">{currencySymbol}{spent.toLocaleString()}</span>
+            <span className="text-3xl font-bold">{currencySymbol}{(spent || 0).toLocaleString()}</span>
             <span className="text-muted-foreground">
-              / {currencySymbol}{goal.toLocaleString()}
+              / {currencySymbol}{(goal || 0).toLocaleString()}
             </span>
           </div>
           <Progress value={progress} className="h-3" />

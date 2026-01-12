@@ -2,10 +2,11 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Budget } from '@/lib/types';
+import { v4 as uuidv4 } from 'uuid';
 
 type BudgetsContextType = {
   budgets: Budget[];
-  addBudget: (budget: Budget) => void;
+  addBudget: (budget: Omit<Budget, 'id'>) => void;
   updateBudget: (budget: Budget) => void;
   deleteBudget: (id: string) => void;
 };
@@ -23,7 +24,10 @@ export const BudgetsProvider = ({ children }: { children: ReactNode }) => {
     const saved = localStorage.getItem("spendcontrol_budgets");
     if (saved) {
       try {
-        setBudgets(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        // Retroactively fix missing IDs
+        const validated = Array.isArray(parsed) ? parsed.map((b: any) => ({ ...b, id: b.id || uuidv4() })) : [];
+        setBudgets(validated);
       } catch (e) {
         console.error("Failed to load budgets");
       }
@@ -37,8 +41,9 @@ export const BudgetsProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [budgets, mounted]);
 
-  const addBudget = (budget: Budget) => {
-    setBudgets((prev) => [...prev, budget]);
+  const addBudget = (budget: Omit<Budget, 'id'> & { id?: string }) => {
+    const newBudget = { ...budget, id: budget.id || uuidv4() };
+    setBudgets((prev) => [...prev, newBudget]);
   };
 
   const updateBudget = (updatedBudget: Budget) => {

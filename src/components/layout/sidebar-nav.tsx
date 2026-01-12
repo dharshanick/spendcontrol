@@ -2,73 +2,88 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 import {
-  Home,
-  Settings,
-  Target,
-  IndianRupee,
-  ListChecks,
-  AreaChart,
-  User,
-  Archive,
+  LayoutDashboard,
+  Wallet,
+  Receipt,
+  TrendingUp,
+  CheckSquare,
+  BarChart3,
+  History,
   Gamepad2,
-  WalletCards,
+  User,
+  Settings
 } from "lucide-react";
 
-import Logo from "../shared/logo";
-import { cn } from "@/lib/utils";
-import type { NavItem } from "@/lib/types";
-
-const navItems: NavItem[] = [
-  { href: "/profile", label: "Profile", icon: User },
-  { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/budgets", label: "Budgets", icon: Target },
-  { href: "/expenses", label: "Expenses", icon: WalletCards },
-  { href: "/income", label: "Income", icon: IndianRupee },
-  { href: "/todos", label: "To-Do List", icon: ListChecks },
-  { href: "/reports", label: "Reports", icon: AreaChart },
-  { href: "/previous-history", label: "Previous History", icon: Archive },
-  { href: "/game", label: "Game", icon: Gamepad2 },
-];
-
-type SidebarNavProps = {
-  className?: string;
-};
-
-export default function SidebarNav({ className }: SidebarNavProps) {
+export default function SidebarNav() {
   const pathname = usePathname();
 
+  // 1. Main Navigation
+  const mainNavItems = [
+    { href: "/dashboard", icon: LayoutDashboard, label: "Home" },
+    { href: "/budgets", icon: Wallet, label: "Budgets" },
+    { href: "/expenses", icon: Receipt, label: "Expenses" },
+    { href: "/income", icon: TrendingUp, label: "Income" },
+    { href: "/todos", icon: CheckSquare, label: "To-Do List" },
+    { href: "/reports", icon: BarChart3, label: "Reports" },
+    { href: "/previous-history", icon: History, label: "Previous History" },
+    { href: "/game", icon: Gamepad2, label: "Game" },
+  ];
+
+  // 2. Secondary Navigation (Profile & Settings)
+  const secondaryNavItems = [
+    { href: "/profile", icon: User, label: "Profile" },
+    { href: "/settings", icon: Settings, label: "Settings" },
+  ];
+
   return (
-    <div className={cn("flex h-full flex-col p-4 pb-24", className)}>
-
-      {/* 1. NAV ITEMS (Now at the very top) */}
-      <nav className="flex flex-col gap-2">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href === '/expenses' && pathname.startsWith('/expenses'));
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground transition-all hover:text-sidebar-accent-foreground hover:bg-sidebar-accent",
-                isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
-              )}
-            >
-              <item.icon className="h-5 w-5" />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* 2. LOGO/NAME (Moved to the bottom using 'mt-auto') */}
-      <div className="mt-auto pt-6 border-t border-sidebar-border">
-        <Link href="/dashboard" className="flex justify-center">
-          <Logo />
-        </Link>
+    <nav className="flex flex-col h-full py-6 px-4">
+      {/* APP LOGO */}
+      <div className="mb-8 px-2 flex items-center gap-2">
+        {/* You can put your Logo Image or Text here */}
+        <span className="text-xl font-bold text-primary">SpendControl</span>
       </div>
 
-    </div>
+      {/* TOP LINKS (Main) */}
+      <div className="space-y-1">
+        {mainNavItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              pathname === item.href
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <item.icon className="h-4 w-4" />
+            {item.label}
+          </Link>
+        ))}
+      </div>
+
+      {/* ✅ FIX: Removed 'mt-auto' so there is no huge gap.
+         Added 'mt-4 pt-4 border-t' to create a small separator line immediately after Game.
+      */}
+      <div className="space-y-1 mt-4 pt-4 border-t border-border/50">
+        {secondaryNavItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              pathname === item.href
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <item.icon className="h-4 w-4" />
+            {item.label}
+          </Link>
+        ))}
+      </div>
+    </nav>
   );
 }

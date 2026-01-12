@@ -55,7 +55,7 @@ export default function SummaryCard({
         ) : icon}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{currencySymbol}{amount.toLocaleString()}</div>
+        <div className="text-2xl font-bold">{currencySymbol}{amount?.toLocaleString() || "0"}</div>
         <TrendIcon comparison={comparison} />
       </CardContent>
     </Card>
