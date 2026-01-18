@@ -158,6 +158,21 @@ export default function DashboardPage() {
         <>
             <ReminderModal />
             <div className="space-y-6 pb-24">
+
+                {/* 1. Add 'justify-center' to center everything */}
+                {/* 2. Add 'pt-4' to push it down from the status bar */}
+                <div className="flex items-center justify-center gap-3 mb-8 pt-4 relative">
+                    {/* The Logo Image */}
+                    <div className="h-10 w-10 bg-green-500/20 rounded-xl flex items-center justify-center">
+                        <Wallet className="h-6 w-6 text-green-500" />
+                    </div>
+
+                    {/* The Text */}
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent">
+                        SpendControl
+                    </h1>
+                </div>
+
                 <QuickActions />
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-3">
