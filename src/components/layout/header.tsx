@@ -21,11 +21,11 @@ import { useUser } from "@/hooks/use-user";
 import { useRouter } from "next/navigation";
 
 const ThreeStarBadge = () => (
-    <div className="absolute top-0 right-0 bg-yellow-400 p-1 rounded-full shadow-lg transform translate-x-1/4 -translate-y-1/4">
-        <div className="flex gap-px">
-            <Star className="h-2 w-2 text-white fill-white" />
-        </div>
+  <div className="absolute top-0 right-0 bg-yellow-400 p-1 rounded-full shadow-lg transform translate-x-1/4 -translate-y-1/4">
+    <div className="flex gap-px">
+      <Star className="h-2 w-2 text-white fill-white" />
     </div>
+  </div>
 );
 
 
@@ -58,15 +58,15 @@ export default function Header() {
 
       <div className="flex w-full items-center justify-end gap-2">
         <Button variant="outline" className="hidden sm:flex" onClick={() => setAddIncomeModalOpen(true)}>
-            <PlusCircle className="mr-2" />
-            Add Income
+          <PlusCircle className="mr-2" />
+          Add Income
         </Button>
         <Button className="hidden sm:flex" onClick={() => setAddExpenseModalOpen(true)}>
-            <PlusCircle className="mr-2" />
-            Add Expense
+          <PlusCircle className="mr-2" />
+          Add Expense
         </Button>
 
-        {mounted && (
+        {mounted && user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -78,11 +78,11 @@ export default function Header() {
                     className="rounded-full object-cover"
                   />
                 ) : (
-                   <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
-                        <UserIcon className="h-6 w-6 text-muted-foreground" />
-                    </div>
+                  <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
+                    <UserIcon className="h-6 w-6 text-muted-foreground" />
+                  </div>
                 )}
-                 {(user.highestGameScore || 0) >= 60 && <ThreeStarBadge />}
+                {(user.highestGameScore || 0) >= 60 && <ThreeStarBadge />}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -120,4 +120,4 @@ export default function Header() {
   );
 }
 
-    
+

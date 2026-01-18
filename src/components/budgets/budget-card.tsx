@@ -1,122 +1,93 @@
-
 "use client";
 
-import { AlertCircle, CalendarDays, MoreVertical, Target, Trash2, TrendingDown, TrendingUp } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { format } from "date-fns";
-import type { Budget } from "@/lib/types";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
+import { Trash2, TrendingUp, AlertCircle, Calendar } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
+import { format, parseISO } from "date-fns";
 
-type BudgetCardProps = {
-  budget: Budget;
+interface BudgetCardProps {
+  budget: any;
   onDelete: () => void;
-};
+}
 
 export default function BudgetCard({ budget, onDelete }: BudgetCardProps) {
   const { currencySymbol } = useCurrency();
-  const { name, goal, spent, startDate, endDate } = budget;
-  const progress = goal > 0 ? (spent / goal) * 100 : 0;
-  const remaining = goal - spent;
 
-  const getStatus = () => {
-    if (progress > 100)
-      return {
-        message: "You've exceeded your budget.",
-        variant: "destructive",
-        icon: <TrendingDown className="h-4 w-4" />,
-      };
-    if (progress >= 90)
-      return {
-        message: "You're approaching your budget limit.",
-        variant: "destructive",
-        icon: <AlertCircle className="h-4 w-4" />,
-      };
-    return {
-      message: "You're on track.",
-      variant: "default",
-      icon: <TrendingUp className="h-4 w-4 text-green-500" />,
-    };
-  };
+  // Calculate percentage
+  const percentage = Math.min(100, Math.max(0, (budget.spent / budget.goal) * 100));
+  const remaining = budget.goal - budget.spent;
+  const isOverBudget = remaining < 0;
 
-  const status = getStatus();
+  // Format Dates
+  const dateRange = `${format(parseISO(budget.startDate), 'MMM d')} - ${format(parseISO(budget.endDate), 'MMM d, yyyy')}`;
 
   return (
-    <Card className="flex flex-col">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-lg">{name} Budget</CardTitle>
-            <CardDescription className="flex items-center gap-2 pt-1">
-              <CalendarDays className="h-4 w-4" />
-              {format(startDate, "MMM d")} - {format(endDate, "MMM d, yyyy")}
-            </CardDescription>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col flex-grow justify-between">
+    <Card className="border border-zinc-800 bg-black/40 hover:bg-black/60 transition-all group relative overflow-hidden">
+
+      {/* Background Glow based on status */}
+      <div className={`absolute top-0 left-0 w-1 h-full ${isOverBudget ? 'bg-red-500' : 'bg-green-500'}`}></div>
+
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <div>
-          <div className="flex items-baseline gap-2 mb-2">
-            <span className="text-3xl font-bold">{currencySymbol}{(spent || 0).toLocaleString()}</span>
-            <span className="text-muted-foreground">
-              / {currencySymbol}{(goal || 0).toLocaleString()}
-            </span>
-          </div>
-          <Progress value={progress} className="h-3" />
-          <div className="text-sm text-muted-foreground mt-2">
-            {remaining >= 0 ? (
-              <p>
-                <span className="font-semibold text-green-500">
-                  {currencySymbol}{remaining.toLocaleString()}
-                </span>{" "}
-                left to spend
-              </p>
-            ) : (
-              <p>
-                <span className="font-semibold text-destructive">
-                  {currencySymbol}{Math.abs(remaining).toLocaleString()}
-                </span>{" "}
-                over budget
-              </p>
-            )}
+          <CardTitle className="text-lg font-bold">{budget.name}</CardTitle>
+          <div className="flex items-center text-xs text-muted-foreground mt-1 gap-1">
+            <Calendar className="h-3 w-3" />
+            {dateRange}
           </div>
         </div>
-        <Alert
-          variant={status.variant as "default" | "destructive"}
-          className="mt-6"
-        >
-          {status.icon}
-          <AlertTitle
-            className={cn(
-              status.variant === "destructive" ? "text-destructive" : ""
-            )}
-          >
-            {status.message}
-          </AlertTitle>
-        </Alert>
+        <Button variant="ghost" size="icon" onClick={onDelete} className="text-muted-foreground hover:text-red-500 hover:bg-red-500/10">
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+
+        {/* Money Stats */}
+        <div className="flex items-end gap-2">
+          <span className="text-3xl font-bold text-white">
+            {currencySymbol}{budget.spent.toLocaleString()}
+          </span>
+          <span className="text-muted-foreground mb-1">
+            / {currencySymbol}{budget.goal.toLocaleString()}
+          </span>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="space-y-2">
+          <Progress
+            value={percentage}
+            className={`h-2 ${isOverBudget ? 'bg-red-900/20' : 'bg-zinc-800'}`}
+            // We need to style the indicator specifically in globals.css or inline style if component supports custom indicator class
+            // For standard shadcn/ui, the indicator color is often derived from 'bg-primary'.
+            // To force color:
+            style={{
+              '--progress-background': isOverBudget ? '#ef4444' : '#22c55e'
+            } as any}
+          />
+
+          <div className="flex justify-between text-sm font-medium">
+            <span className={isOverBudget ? "text-red-400" : "text-green-500"}>
+              {isOverBudget
+                ? `${currencySymbol}${Math.abs(remaining).toLocaleString()} over budget`
+                : `${currencySymbol}${remaining.toLocaleString()} left to spend`
+              }
+            </span>
+            <span className="text-muted-foreground">{Math.round(percentage)}%</span>
+          </div>
+        </div>
+
+        {/* Status Message */}
+        <div className={`flex items-center gap-2 p-3 rounded-lg text-sm ${isOverBudget ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+          {isOverBudget ? <AlertCircle className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+          <span>
+            {isOverBudget
+              ? "You've exceeded your budget limit."
+              : "You're on track to save this period."}
+          </span>
+        </div>
+
       </CardContent>
     </Card>
   );

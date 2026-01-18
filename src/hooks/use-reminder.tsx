@@ -37,7 +37,7 @@ export const ReminderProvider = ({ children }: { children: ReactNode }) => {
     };
     setSnoozedTodos(prev => [...prev.filter(st => st.id !== todoId), newSnooze]);
   };
-  
+
   useEffect(() => {
     if (!billReminders) {
       setDueTodo(null); // Clear any active reminder if settings are turned off
@@ -47,11 +47,11 @@ export const ReminderProvider = ({ children }: { children: ReactNode }) => {
     const checkReminders = () => {
       // Clean up old snoozes
       setSnoozedTodos(prev => {
-          const activeSnoozes = prev.filter(st => !isPast(parseISO(st.snoozeUntil)));
-          if (activeSnoozes.length < prev.length) {
-              return activeSnoozes;
-          }
-          return prev;
+        const activeSnoozes = prev.filter(st => !isPast(parseISO(st.snoozeUntil)));
+        if (activeSnoozes.length < prev.length) {
+          return activeSnoozes;
+        }
+        return prev;
       });
 
       const pendingImportantTodos = todos.filter(t => !t.completed && t.isImportant);
@@ -61,23 +61,25 @@ export const ReminderProvider = ({ children }: { children: ReactNode }) => {
         const isSnoozed = snoozedTodos.some(st => st.id === todo.id && !isPast(parseISO(st.snoozeUntil)));
 
         if (isPast(dueDate) && !isSnoozed && (!dueTodo || dueTodo.id !== todo.id)) {
-            // Trigger browser notification
-            if ("Notification" in window && Notification.permission === "granted") {
-                new Notification("SpendControl Reminder", {
-                    body: `Your task "${todo.text}" is due!`,
-                    icon: "/icon-192x192.png",
-                    vibrate: vibrationEnabled ? [200, 100, 200] : undefined,
-                });
-            } else if (vibrationEnabled && 'vibrate' in navigator) {
-                navigator.vibrate([200, 100, 200]); // Vibrate pattern
+          // Trigger browser notification
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification("SpendControl Reminder", {
+              body: `Your task "${todo.text}" is due!`,
+              icon: "/icon-192x192.png",
+            });
+            if (vibrationEnabled && 'vibrate' in navigator) {
+              navigator.vibrate([200, 100, 200]);
             }
+          } else if (vibrationEnabled && 'vibrate' in navigator) {
+            navigator.vibrate([200, 100, 200]); // Vibrate pattern
+          }
 
-            setDueTodo(todo);
-            break; // Show one reminder at a time
+          setDueTodo(todo);
+          break; // Show one reminder at a time
         }
       }
     };
-    
+
     // Check for reminders every 30 seconds
     const intervalId = setInterval(checkReminders, 30 * 1000);
 
@@ -86,7 +88,7 @@ export const ReminderProvider = ({ children }: { children: ReactNode }) => {
 
     // Request notification permission on mount
     if ("Notification" in window && Notification.permission !== "denied") {
-        Notification.requestPermission();
+      Notification.requestPermission();
     }
 
     return () => clearInterval(intervalId);

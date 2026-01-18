@@ -1,0 +1,22 @@
+src/app/(app)/budgets/page.tsx(87,9): error TS2322: Type '(budget: Omit<Budget, "id">) => void' is not assignable to type '(budget: Omit<Budget, "id" | "spent">) => void'.
+  Types of parameters 'budget' and 'budget' are incompatible.
+    Property 'spent' is missing in type 'Omit<Budget, "id" | "spent">' but required in type 'Omit<Budget, "id">'.
+src/app/(app)/dashboard/page.tsx(309,29): error TS2322: Type '{ referenceDate: Date; weekStartDate: Date; weekEndDate: Date; }' is not assignable to type 'IntrinsicAttributes & { referenceDate?: Date | undefined; }'.
+  Property 'weekStartDate' does not exist on type 'IntrinsicAttributes & { referenceDate?: Date | undefined; }'.
+src/components/auth/forgot-password-form.tsx(53,11): error TS2339: Property 'getUserByEmail' does not exist on type 'UserContextType'.
+src/components/calendar/calendar-view.tsx(107,9): error TS2322: Type '{ low: Date[]; medium: Date[]; high: Date[]; footer: Record<string, React.ReactNode>; }' is not assignable to type 'Record<string, Matcher | Matcher[] | undefined>'.
+  Property 'footer' is incompatible with index signature.
+    Type 'Record<string, ReactNode>' is not assignable to type 'Matcher | Matcher[] | undefined'.
+      Type 'Record<string, ReactNode>' is missing the following properties from type 'Date': toDateString, toTimeString, toLocaleDateString, toLocaleTimeString, and 37 more.
+src/components/calendar/calendar-view.tsx(114,11): error TS2353: Object literal may only specify known properties, and 'DayContent' does not exist in type 'Partial<CustomComponents>'.
+src/components/calendar/calendar-view.tsx(114,24): error TS7006: Parameter 'props' implicitly has an 'any' type.
+src/components/layout/header.tsx(73,18): error TS18047: 'user' is possibly 'null'.
+src/components/layout/header.tsx(75,26): error TS18047: 'user' is possibly 'null'.
+src/components/layout/header.tsx(85,20): error TS18047: 'user' is possibly 'null'.
+src/components/layout/header.tsx(91,68): error TS18047: 'user' is possibly 'null'.
+src/components/layout/header.tsx(93,22): error TS18047: 'user' is possibly 'null'.
+src/components/layout/mobile-header.tsx(51,25): error TS2322: Type '{ className: string; }' is not assignable to type 'IntrinsicAttributes'.
+  Property 'className' does not exist on type 'IntrinsicAttributes'.
+src/components/theme-provider.tsx(5,41): error TS2307: Cannot find module 'next-themes/dist/types' or its corresponding type declarations.
+src/components/ui/calendar.tsx(58,9): error TS2353: Object literal may only specify known properties, and 'IconLeft' does not exist in type 'Partial<CustomComponents>'.
+src/hooks/use-reminder.tsx(69,21): error TS2353: Object literal may only specify known properties, and 'vibrate' does not exist in type 'NotificationOptions'.

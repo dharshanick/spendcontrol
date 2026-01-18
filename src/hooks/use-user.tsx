@@ -8,18 +8,19 @@ type UserContextType = {
   setUser: (user: Partial<User>) => void;
   updateUser: (updates: Partial<User>) => void; // Added for convenience
   resetUser: () => void;
+  getUserByEmail: (email: string) => User | null;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const initialUser: User = {
-    fullName: 'Guest',
-    email: '',
-    avatar: '',
-    securityAnswers: { bestFriend: '', nickname: '', petName: '' },
-    highestGameScore: 0,
-    gameHighScores: [],
-    currency: "INR" // Ensure this exists
+  fullName: 'Guest',
+  email: '',
+  avatar: '',
+  securityAnswers: { bestFriend: '', nickname: '', petName: '' },
+  highestGameScore: 0,
+  gameHighScores: [],
+  currency: "INR" // Ensure this exists
 };
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
@@ -32,39 +33,44 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     setMounted(true);
     const saved = localStorage.getItem("spendcontrol_user");
     if (saved) {
-        try {
-            setCurrentUser(JSON.parse(saved));
-        } catch (e) {
-            console.error("Failed to parse user data");
-        }
+      try {
+        setCurrentUser(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse user data");
+      }
     }
   }, []);
 
   // 3. Save data whenever 'user' changes
   useEffect(() => {
-      if (mounted) {
-          localStorage.setItem("spendcontrol_user", JSON.stringify(user));
-      }
+    if (mounted) {
+      localStorage.setItem("spendcontrol_user", JSON.stringify(user));
+    }
   }, [user, mounted]);
 
   const updateUser = useCallback((updatedFields: Partial<User>) => {
-      setCurrentUser(prev => ({ ...prev, ...updatedFields }));
+    setCurrentUser(prev => ({ ...prev, ...updatedFields }));
   }, []);
 
   const setUser = useCallback((updatedFields: Partial<User>) => {
-       setCurrentUser(prev => ({ ...prev, ...updatedFields }));
+    setCurrentUser(prev => ({ ...prev, ...updatedFields }));
   }, []);
 
   const resetUser = () => {
     if (confirm("Are you sure you want to reset your profile?")) {
-        setCurrentUser(initialUser);
-        localStorage.removeItem("spendcontrol_user");
-        window.location.reload();
+      setCurrentUser(initialUser);
+      localStorage.removeItem("spendcontrol_user");
+      window.location.reload();
     }
   };
 
+  const getUserByEmail = useCallback((email: string) => {
+    if (user.email === email) return user;
+    return null;
+  }, [user]);
+
   return (
-    <UserContext.Provider value={{ user, setUser, updateUser, resetUser }}>
+    <UserContext.Provider value={{ user, setUser, updateUser, resetUser, getUserByEmail }}>
       {children}
     </UserContext.Provider>
   );

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import Logo from "@/components/shared/logo";
 import {
   LayoutDashboard,
   Wallet,
@@ -16,7 +17,7 @@ import {
   Settings
 } from "lucide-react";
 
-export default function SidebarNav() {
+export default function SidebarNav({ className, onLinkClick }: { className?: string; onLinkClick?: () => void }) {
   const pathname = usePathname();
 
   // 1. Main Navigation
@@ -38,11 +39,10 @@ export default function SidebarNav() {
   ];
 
   return (
-    <nav className="flex flex-col h-full py-6 px-4">
+    <nav className={cn("flex flex-col h-full py-6 px-4", className)}>
       {/* APP LOGO */}
-      <div className="mb-8 px-2 flex items-center gap-2">
-        {/* You can put your Logo Image or Text here */}
-        <span className="text-xl font-bold text-primary">SpendControl</span>
+      <div className="mb-8 px-2">
+        <Logo />
       </div>
 
       {/* TOP LINKS (Main) */}
@@ -51,6 +51,7 @@ export default function SidebarNav() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={onLinkClick}
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
               pathname === item.href
@@ -72,6 +73,7 @@ export default function SidebarNav() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={onLinkClick}
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
               pathname === item.href
