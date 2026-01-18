@@ -8,6 +8,7 @@ import { useCurrency } from "@/hooks/use-currency";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { saveAndOpenPDF } from "@/lib/download-helper";
 
 export default function ReportsPage() {
   const { transactions } = useTransactions();
@@ -26,7 +27,7 @@ export default function ReportsPage() {
   const savingsRate = totalIncome > 0 ? ((totalSavings / totalIncome) * 100).toFixed(1) : "0";
 
   // --- PDF GENERATOR ---
-  const generatePDF = () => {
+  const generatePDF = async () => {
     const doc = new jsPDF();
     const formatMoney = (amt: number) => `INR ${amt.toLocaleString()}`;
 
@@ -77,7 +78,7 @@ export default function ReportsPage() {
       headStyles: { fillColor: [22, 163, 74] },
     });
 
-    doc.save(`SpendControl_Full_Report.pdf`);
+    await saveAndOpenPDF(doc, `SpendControl_Report_${format(new Date(), "yyyy-MM-dd")}.pdf`);
   };
 
   return (
