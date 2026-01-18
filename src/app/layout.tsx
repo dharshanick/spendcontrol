@@ -1,17 +1,25 @@
-import type {Metadata} from 'next';
-import './globals.css';
-import { Toaster } from "@/components/ui/toaster"
-import { ThemeProvider } from '@/components/theme-provider';
-import { Inter } from 'next/font/google';
-import { cn } from '@/lib/utils';
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/toaster";
+import AppLock from "@/components/security/app-lock";
+import { cn } from "@/lib/utils";
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-body' });
-
+const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
 
 export const metadata: Metadata = {
-  title: 'Spend Control',
-  description: 'Personal Finance & Expense Tracker Web App',
-  manifest: '/manifest.json',
+  title: "SpendControl",
+  description: "Track your expenses offline.",
+  manifest: "/manifest.json",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -32,7 +40,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <div className="min-h-screen bg-background pt-[env(safe-area-inset-top)]">
+            <AppLock>{children}</AppLock>
+          </div>
           <Toaster />
         </ThemeProvider>
       </body>
