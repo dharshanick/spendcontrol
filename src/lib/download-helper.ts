@@ -15,19 +15,19 @@ export const saveAndOpenPDF = async (doc: jsPDF, fileName: string) => {
         // Get the PDF as a Base64 string
         const base64Data = doc.output("datauristring").split(",")[1];
 
-        // Write the file to the device's Documents directory
+        // CHANGE 1: Use 'Cache' instead of 'Documents' (Works on all Android versions)
         const savedFile = await Filesystem.writeFile({
             path: fileName,
             data: base64Data,
-            directory: Directory.Documents,
+            directory: Directory.Cache,
         });
 
-        // Share the file (This opens the "Open With" dialog)
+        // CHANGE 2: Share the file (User can choose "Save to Drive" or "WhatsApp" from here)
         await Share.share({
             title: "Open Financial Report",
             text: "Here is your SpendControl statement.",
             url: savedFile.uri,
-            dialogTitle: "Download PDF",
+            dialogTitle: "Save or Send PDF",
         });
 
     } catch (error) {
