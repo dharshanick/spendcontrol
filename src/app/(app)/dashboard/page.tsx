@@ -161,7 +161,7 @@ export default function DashboardPage() {
 
                 {/* 1. Add 'justify-center' to center everything */}
                 {/* 2. Add 'pt-4' to push it down from the status bar */}
-                <div className="flex items-center justify-center gap-3 mb-8 pt-4 relative">
+                <div className="flex items-center justify-center gap-3 mb-8 pt-16 relative">
                     {/* The Logo Image */}
                     <div className="h-10 w-10 bg-green-500/20 rounded-xl flex items-center justify-center">
                         <Wallet className="h-6 w-6 text-green-500" />
