@@ -55,9 +55,9 @@ export default function MobileHeader() {
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden fixed top-14 left-4 z-50 h-10 w-10 text-zinc-400 hover:text-white"
+            className="md:hidden fixed top-14 left-4 z-50 h-14 w-14 text-zinc-400 hover:text-white"
           >
-            <Menu className="h-8 w-8" />
+            <Menu className="h-10 w-10" />
             <span className="sr-only">Toggle Menu</span>
           </Button>
         </SheetTrigger>
