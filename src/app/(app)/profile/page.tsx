@@ -1,368 +1,348 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Trophy, Star, Medal, Gamepad2, Share2, Crown, User, Mail, Calendar as CalendarIcon, Wallet, Wifi, Edit3, Camera, Upload, Check, Eye, EyeOff, FileText, Download } from "lucide-react";
-import { useState, useRef, ChangeEvent, useCallback } from "react";
-import Cropper from "react-easy-crop";
-import { Area } from "react-easy-crop";
-import { useGame } from "@/hooks/use-game";
-import { usePrivacy } from "@/hooks/use-privacy";
-import { useTransactions } from "@/hooks/use-transactions";
-import { useCurrency } from "@/hooks/use-currency";
+import { toast } from "sonner";
+import { Crown, Camera, Download, Edit2, Wifi, Eye, EyeOff, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { format } from "date-fns";
-import { saveAndOpenPDF } from "@/lib/download-helper";
+import Cropper from "react-easy-crop";
+import getCroppedImg from "@/lib/cropImage";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Slider } from "@/components/ui/slider";
+
+// --- TYPE DEFINITION FOR TRANSACTIONS ---
+interface Transaction {
+    id: string;
+    title: string;
+    amount: number;
+    type: "income" | "expense";
+    date: string;
+    category: string;
+}
 
 export default function ProfilePage() {
-    const { score } = useGame();
-    const { isPrivacyMode, togglePrivacy } = usePrivacy();
-    const { transactions } = useTransactions();
-    const { currencySymbol } = useCurrency();
+    // --- USER STATE ---
+    const [name, setName] = useState("Justin Mason");
+    const [email, setEmail] = useState("user@example.com");
+    const [avatar, setAvatar] = useState<string | null>(null);
+    const [isEditing, setIsEditing] = useState(false);
 
-    const hasThreeStars = score >= 60;
-    const level = Math.floor(score / 10);
+    // --- FINANCIAL STATE (LIVE DATA) ---
+    const [balance, setBalance] = useState("₹ 0");
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [showBalance, setShowBalance] = useState(true);
 
-    // Profile Data
-    const [profile, setProfile] = useState({
-        name: "Justin Mason",
-        email: "user@example.com",
-        image: null as string | null,
-    });
-
-    // Edit/Crop State
-    const [isEditOpen, setIsEditOpen] = useState(false);
-    const [editForm, setEditForm] = useState({ ...profile });
-    const [previewImage, setPreviewImage] = useState<string | null>(null);
-
+    // --- CROPPER STATE ---
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
-    const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
-    const [isCropping, setIsCropping] = useState(false);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+    const [isCropperOpen, setIsCropperOpen] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // --- PDF GENERATOR (FIXED) ---
-    const generatePDF = async () => {
-        const doc = new jsPDF();
+    // 1. LOAD ALL DATA (User + Financials)
+    useEffect(() => {
+        // Load User Details
+        const savedName = localStorage.getItem("userName");
+        const savedEmail = localStorage.getItem("userEmail");
+        const savedAvatar = localStorage.getItem("userAvatar");
+        if (savedName) setName(savedName);
+        if (savedEmail) setEmail(savedEmail);
+        if (savedAvatar) setAvatar(savedAvatar);
 
-        // 1. Calculate Totals for the PDF
-        const totalIncome = transactions
-            .filter(t => t.type === 'income')
-            .reduce((sum, t) => sum + t.amount, 0);
+        // Load Live Transactions
+        const savedTxns = localStorage.getItem("transactions");
+        if (savedTxns) {
+            const parsedTxns: Transaction[] = JSON.parse(savedTxns);
+            setTransactions(parsedTxns);
 
-        const totalExpense = transactions
-            .filter(t => t.type === 'expense')
-            .reduce((sum, t) => sum + t.amount, 0);
+            // Calculate Real Balance
+            const income = parsedTxns
+                .filter(t => t.type === "income")
+                .reduce((sum, t) => sum + t.amount, 0);
+            const expense = parsedTxns
+                .filter(t => t.type === "expense")
+                .reduce((sum, t) => sum + t.amount, 0);
 
-        const netSavings = totalIncome - totalExpense;
-
-        // Helper to format currency safely for PDF (AVOIDING '₹' symbol)
-        const formatMoney = (amt: number) => `INR ${amt.toLocaleString()}`;
-
-        // --- HEADER ---
-        doc.setFontSize(22);
-        doc.setTextColor("#16a34a"); // Green
-        doc.setFont("helvetica", "bold");
-        doc.text("SpendControl", 14, 20);
-
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.setFont("helvetica", "normal");
-        doc.text("Official Monthly Statement", 14, 26);
-
-        doc.setDrawColor(200);
-        doc.line(14, 32, 196, 32);
-
-        // --- ACCOUNT DETAILS ---
-        doc.setFontSize(12);
-        doc.setTextColor(0);
-        doc.text(`Account Holder: ${profile.name}`, 14, 45);
-        doc.text(`Email: ${profile.email}`, 14, 52);
-        doc.text(`Generated On: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, 14, 59);
-
-        // --- TRANSACTION TABLE ---
-        const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-        const tableData = sortedTransactions.map(t => [
-            format(new Date(t.date), "yyyy-MM-dd"),
-            t.title,
-            t.category,
-            t.type.toUpperCase(),
-            // FIX: Using "INR" instead of symbol to prevent garbled text
-            `${t.type === 'income' ? '+' : '-'} ${t.amount.toLocaleString()}`
-        ]);
-
-        autoTable(doc, {
-            startY: 70,
-            head: [["Date", "Description", "Category", "Type", "Amount (INR)"]],
-            body: tableData,
-            theme: "grid",
-            headStyles: { fillColor: [22, 163, 74], textColor: 255 },
-            styles: { fontSize: 10, cellPadding: 3 },
-            alternateRowStyles: { fillColor: [240, 253, 244] },
-        });
-
-        // --- FINAL SUMMARY (AT THE BOTTOM) ---
-        const finalY = (doc as any).lastAutoTable.finalY + 10;
-
-        // Draw Summary Box
-        doc.setFillColor(245, 245, 245); // Light Gray
-        doc.roundedRect(14, finalY, 182, 40, 2, 2, "F");
-
-        doc.setFontSize(12);
-        doc.setTextColor(0);
-        doc.setFont("helvetica", "bold");
-        doc.text("Statement Summary", 20, finalY + 10);
-
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-
-        // Labels
-        doc.text("Total Income:", 20, finalY + 20);
-        doc.text("Total Expenses:", 20, finalY + 28);
-        doc.text("Net Savings:", 20, finalY + 36);
-
-        // Values (Right Aligned mostly)
-        doc.setFont("helvetica", "bold");
-
-        doc.setTextColor(22, 163, 74); // Green
-        doc.text(formatMoney(totalIncome), 80, finalY + 20);
-
-        doc.setTextColor(220, 38, 38); // Red
-        doc.text(formatMoney(totalExpense), 80, finalY + 28);
-
-        doc.setTextColor(0); // Black for savings
-        doc.text(formatMoney(netSavings), 80, finalY + 36);
-
-        // Footer
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text("Generated by SpendControl App. This document is for personal record keeping.", 105, finalY + 50, { align: "center" });
-
-        await saveAndOpenPDF(doc, `SpendControl_Statement_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-    };
-
-    // --- HANDLERS (Crop/Edit) ---
-    const onCropComplete = useCallback((croppedArea: Area, croppedAreaPixels: Area) => {
-        setCroppedAreaPixels(croppedAreaPixels);
+            const totalBalance = income - expense;
+            setBalance(`₹ ${totalBalance.toLocaleString()}`);
+        }
     }, []);
 
-    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImageSrc(reader.result as string);
-                setIsCropping(true);
-                setZoom(1);
-                setCrop({ x: 0, y: 0 });
-            };
-            reader.readAsDataURL(file);
+    // 2. SAVE NAME
+    const handleSaveName = () => {
+        localStorage.setItem("userName", name);
+        setIsEditing(false);
+        toast.success("Name updated successfully!");
+    };
+
+    // 3. IMAGE SELECT & CROPPER LOGIC
+    const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            const imageDataUrl = await readFile(file);
+            setImageSrc(imageDataUrl);
+            setIsCropperOpen(true);
         }
     };
 
-    const createCroppedImage = async () => {
+    const readFile = (file: File): Promise<string> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.addEventListener("load", () => resolve(reader.result as string), false);
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const onCropComplete = useCallback((_: any, croppedAreaPixels: any) => {
+        setCroppedAreaPixels(croppedAreaPixels);
+    }, []);
+
+    const saveCroppedImage = useCallback(async () => {
         try {
             if (!imageSrc || !croppedAreaPixels) return;
-            const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels);
-            if (croppedImage) {
-                setPreviewImage(croppedImage);
-                setIsCropping(false);
-                setImageSrc(null);
-            }
-        } catch (e) { console.error(e); }
-    };
+            const croppedImageBase64 = await getCroppedImg(imageSrc, croppedAreaPixels);
+            setAvatar(croppedImageBase64);
+            localStorage.setItem("userAvatar", croppedImageBase64);
+            setIsCropperOpen(false);
+            setImageSrc(null);
+            toast.success("Profile photo updated!");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to crop image.");
+        }
+    }, [imageSrc, croppedAreaPixels]);
 
-    const saveProfile = () => {
-        setProfile({ ...editForm, image: previewImage || editForm.image });
-        setIsEditOpen(false);
-    };
+    // 4. GENERATE SMART PDF STATEMENT (With Analysis)
+    const generatePDF = () => {
+        const doc = new jsPDF();
 
-    const openEditModal = () => {
-        setEditForm({ ...profile });
-        setPreviewImage(profile.image);
-        setIsEditOpen(true);
-        setIsCropping(false);
-    }
+        // -- HEADER --
+        doc.setFillColor(10, 10, 10); // Dark Background
+        doc.rect(0, 0, 210, 50, "F");
+
+        doc.setTextColor(34, 197, 94); // Brand Green
+        doc.setFontSize(24);
+        doc.setFont("helvetica", "bold");
+        doc.text("SpendControl", 14, 25);
+
+        doc.setTextColor(200, 200, 200);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text("Official Statement of Accounts", 14, 35);
+        doc.text(`Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 14, 40);
+
+        // -- FINANCIAL SUMMARY BOX --
+        // Calculate totals for the report
+        const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
+        const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+        const netBalance = totalIncome - totalExpense;
+
+        doc.setDrawColor(200, 200, 200);
+        doc.roundedRect(14, 60, 180, 25, 2, 2);
+
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.text("Total Income", 20, 70);
+        doc.text("Total Spent", 80, 70);
+        doc.text("Net Balance", 140, 70);
+
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(22, 163, 74); // Green
+        doc.text(`+ Rs ${totalIncome}`, 20, 78);
+
+        doc.setTextColor(220, 38, 38); // Red
+        doc.text(`- Rs ${totalExpense}`, 80, 78);
+
+        doc.setTextColor(0, 0, 0); // Black
+        doc.text(`Rs ${netBalance}`, 140, 78);
+
+        // -- TRANSACTION TABLE --
+        // Convert our live transaction data into the format PDF needs
+        const tableRows = transactions.map(t => [
+            new Date(t.date).toLocaleDateString(),
+            t.title,
+            t.category,
+            t.type === 'income' ? `+ Rs ${t.amount}` : `- Rs ${t.amount}`
+        ]);
+
+        autoTable(doc, {
+            startY: 95,
+            head: [['Date', 'Description', 'Category', 'Amount']],
+            body: tableRows,
+            theme: 'grid',
+            headStyles: { fillColor: [20, 20, 20], textColor: [255, 255, 255] },
+            styles: { fontSize: 10, cellPadding: 3 },
+            alternateRowStyles: { fillColor: [245, 245, 245] },
+        });
+
+        // -- FOOTER --
+        const pageHeight = doc.internal.pageSize.height;
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Account Holder: ${name} (${email})`, 14, pageHeight - 10);
+
+        doc.save(`SpendControl_Statement_${new Date().toISOString().split('T')[0]}.pdf`);
+        toast.success("Statement downloaded successfully!");
+    };
 
     return (
-        <div className="space-y-6 max-w-5xl mx-auto pb-24">
+        <div className="min-h-screen bg-black pb-24 pt-24 px-4 space-y-8 flex flex-col items-center">
 
-            {/* 1. TOP SECTION: CREDIT CARD & PROFILE HEADER */}
-            <div className="flex flex-col md:flex-row gap-8 items-start">
+            {/* --- CROPPER MODAL --- */}
+            <Dialog open={isCropperOpen} onOpenChange={setIsCropperOpen}>
+                <DialogContent className="bg-zinc-900 border-zinc-800 text-white sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Adjust Profile Picture</DialogTitle>
+                    </DialogHeader>
 
-                {/* PLATINUM CARD */}
-                <div className="relative w-full md:w-[420px] aspect-[1.58/1] rounded-2xl p-6 shadow-2xl overflow-hidden group transition-transform hover:scale-[1.02] duration-300 border border-zinc-400/50">
-                    <div className="absolute inset-0 bg-gradient-to-br from-zinc-200 via-zinc-100 to-zinc-400 z-0"></div>
-                    <div className="absolute inset-0 opacity-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] z-0 mix-blend-multiply"></div>
-                    <div className="absolute -top-[100%] -left-[100%] w-[200%] h-[200%] bg-gradient-to-br from-transparent via-white/40 to-transparent rotate-45 pointer-events-none"></div>
-                    <div className="absolute inset-3 border-2 border-zinc-400/30 rounded-xl pointer-events-none"></div>
-
-                    <div className="relative z-10 flex flex-col justify-between h-full text-zinc-800">
-                        <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-10 rounded-md bg-gradient-to-br from-zinc-300 to-zinc-400 border border-zinc-500 shadow-inner relative overflow-hidden flex items-center justify-center">
-                                    <div className="absolute inset-0 border-[0.5px] border-black/30 rounded-md grid grid-cols-2 grid-rows-2">
-                                        <div className="border-r border-b border-black/30"></div><div className="border-b border-black/30"></div><div className="border-r border-black/30"></div>
-                                    </div>
-                                </div>
-                                <Wifi className="h-6 w-6 text-zinc-600 rotate-90" />
-                            </div>
-                            <div className="text-right">
-                                <h3 className="text-lg font-bold italic tracking-tighter text-black">Spend<span className="text-green-600">Control</span></h3>
-                                <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">Platinum Business</p>
-                            </div>
-                        </div>
-                        <div className="mt-2 flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                {profile.image && (
-                                    <div className="w-12 h-12 rounded-full border-2 border-zinc-400 overflow-hidden shadow-sm grayscale hover:grayscale-0 transition-all">
-                                        <img src={profile.image} alt="Profile" className="w-full h-full object-cover" />
-                                    </div>
-                                )}
-                                <div className="flex gap-4 text-xl md:text-2xl font-mono tracking-widest text-zinc-800 drop-shadow-sm font-bold">
-                                    <span className="opacity-80">••••</span><span className="opacity-80">••••</span><span className="opacity-80">••••</span><span>2026</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex justify-between items-end mt-2">
-                            <div className="space-y-1">
-                                <p className="text-[9px] text-zinc-600 uppercase tracking-widest font-bold">Cardholder</p>
-                                <p className="text-sm md:text-lg font-bold tracking-wide uppercase font-mono truncate max-w-[200px] text-black">{profile.name}</p>
-                            </div>
-                            <div className="space-y-1 text-right">
-                                <p className="text-[9px] text-zinc-600 uppercase tracking-widest font-bold">Valid Thru</p>
-                                <p className="text-sm font-bold font-mono text-black">01/30</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* PROFILE ACTIONS */}
-                <div className="flex-1 space-y-6 w-full">
-                    <div className="flex items-center gap-4">
-                        <div className="relative group">
-                            <div className="w-20 h-20 rounded-full bg-secondary border-2 border-border overflow-hidden flex items-center justify-center">
-                                {profile.image ? <img src={profile.image} alt="User" className="w-full h-full object-cover" /> : <span className="text-2xl font-bold text-muted-foreground">{profile.name.charAt(0)}</span>}
-                            </div>
-                            <button onClick={openEditModal} className="absolute bottom-0 right-0 bg-green-600 p-1.5 rounded-full text-white shadow-lg hover:bg-green-500 transition-colors"><Edit3 className="h-3 w-3" /></button>
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-bold text-foreground">{profile.name}</h1>
-                            <p className="text-muted-foreground flex items-center gap-2 mt-1"><Mail className="h-4 w-4" /> {profile.email}</p>
-                        </div>
+                    <div className="relative h-64 w-full bg-black mt-4 rounded-lg overflow-hidden">
+                        {imageSrc && (
+                            <Cropper
+                                image={imageSrc}
+                                crop={crop}
+                                zoom={zoom}
+                                aspect={1} // Force Square
+                                onCropChange={setCrop}
+                                onCropComplete={onCropComplete}
+                                onZoomChange={setZoom}
+                            />
+                        )}
                     </div>
 
-                    <div className="flex flex-wrap gap-3">
-                        <div className="px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-bold text-primary flex items-center gap-2"><Crown className="h-3.5 w-3.5 text-yellow-500" /> Premium Member</div>
-                        {hasThreeStars && <div className="px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-xs font-bold text-yellow-500 flex items-center gap-2"><Star className="h-3.5 w-3.5 fill-current" /> Elite Status</div>}
-                        <div className="px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-xs font-bold text-green-500 flex items-center gap-2"><Trophy className="h-3.5 w-3.5" /> Level {level}</div>
+                    <div className="pt-4 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-zinc-400">Zoom</span>
+                            <Slider
+                                value={[zoom]}
+                                min={1} max={3} step={0.1}
+                                onValueChange={(val) => setZoom(val[0])}
+                                className="flex-1"
+                            />
+                        </div>
+                        <DialogFooter className="flex gap-2">
+                            <Button variant="ghost" onClick={() => setIsCropperOpen(false)}>Cancel</Button>
+                            <Button onClick={saveCroppedImage} className="bg-green-600 hover:bg-green-500">Save Photo</Button>
+                        </DialogFooter>
                     </div>
-
-                    {/* ACTION BUTTONS */}
-                    <div className="flex flex-wrap gap-2 pt-2">
-                        <Button variant="outline" className="flex-1" onClick={openEditModal}>
-                            <Edit3 className="h-4 w-4 mr-2" /> Edit
-                        </Button>
-
-                        <Button variant="outline" className="flex-1 border-zinc-700 hover:bg-muted" onClick={togglePrivacy}>
-                            {isPrivacyMode ? <><EyeOff className="h-4 w-4 mr-2" /> Show Balance</> : <><Eye className="h-4 w-4 mr-2" /> Hide Balance</>}
-                        </Button>
-
-                        {/* DOWNLOAD BUTTON */}
-                        <Button
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/20"
-                            onClick={generatePDF}
-                        >
-                            <Download className="h-4 w-4 mr-2" /> Statement
-                        </Button>
-                    </div>
-                </div>
-            </div>
-
-            {/* 2. STATS GRID */}
-            <div className="grid gap-6 md:grid-cols-2 mt-8">
-                <Card className="bg-card border-border shadow-sm">
-                    <CardHeader><CardTitle className="flex items-center gap-2 text-foreground"><Gamepad2 className="h-5 w-5 text-purple-500" /> Game Rewards</CardTitle></CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Current Score</span><span className="font-bold text-green-500">{score} / 100</span></div>
-                            <Progress value={Math.min(score, 100)} className="h-2 bg-secondary" />
-                        </div>
-                        <div className="grid grid-cols-3 gap-4">
-                            <div className={`aspect-square rounded-xl border-2 flex flex-col items-center justify-center p-2 text-center transition-all ${score >= 60 ? 'border-yellow-500/30 bg-yellow-500/5' : 'border-border bg-muted/30 grayscale opacity-50'}`}>
-                                <div className={`p-2 rounded-full mb-2 ${score >= 60 ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-secondary'}`}><Trophy className={`h-4 w-4 ${score >= 60 ? 'text-white' : 'text-muted-foreground'}`} /></div>
-                                <span className={`text-[10px] font-bold uppercase ${score >= 60 ? 'text-yellow-600 dark:text-yellow-500' : 'text-muted-foreground'}`}>Guardian</span>
-                            </div>
-                            <div className={`aspect-square rounded-xl border-2 flex flex-col items-center justify-center p-2 text-center transition-all ${score >= 100 ? 'border-purple-500/30 bg-purple-500/5' : 'border-border bg-muted/30 grayscale opacity-50 border-dashed'}`}>
-                                <div className={`p-2 rounded-full mb-2 ${score >= 100 ? 'bg-purple-600' : 'bg-secondary'}`}><Medal className={`h-4 w-4 ${score >= 100 ? 'text-white' : 'text-muted-foreground'}`} /></div>
-                                <span className={`text-[10px] font-bold uppercase ${score >= 100 ? 'text-purple-600 dark:text-purple-500' : 'text-muted-foreground'}`}>Legend</span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-card border-border shadow-sm">
-                    <CardHeader><CardTitle className="flex items-center gap-2 text-foreground"><User className="h-5 w-5 text-blue-500" /> Account Details</CardTitle></CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50"><div className="flex items-center gap-3"><CalendarIcon className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Member Since</span></div><span className="text-sm font-medium text-foreground">Jan 2026</span></div>
-                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50"><div className="flex items-center gap-3"><Wallet className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Currency</span></div><span className="text-sm font-medium text-foreground">Indian Rupee (₹)</span></div>
-                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50"><div className="flex items-center gap-3"><Crown className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Subscription</span></div><span className="text-sm font-bold text-green-600 dark:text-green-400">Premium Plan</span></div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* EDIT MODAL */}
-            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader><DialogTitle>{isCropping ? "Crop Profile Picture" : "Edit Profile"}</DialogTitle><DialogDescription>{isCropping ? "Drag and zoom to position your photo." : "Update your details."}</DialogDescription></DialogHeader>
-                    {isCropping && imageSrc ? (
-                        <div className="py-4">
-                            <div className="relative w-full h-[300px] bg-black rounded-lg overflow-hidden border border-zinc-700">
-                                <Cropper image={imageSrc} crop={crop} zoom={zoom} aspect={1} onCropChange={setCrop} onCropComplete={onCropComplete} onZoomChange={setZoom} showGrid={false} cropShape="round" />
-                            </div>
-                            <div className="mt-4 space-y-2">
-                                <div className="flex justify-between text-xs text-muted-foreground"><span>Zoom</span><span>{Math.round(zoom * 100)}%</span></div>
-                                <input type="range" value={zoom} min={1} max={3} step={0.1} onChange={(e) => setZoom(Number(e.target.value))} className="w-full h-1 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-green-500" />
-                            </div>
-                            <DialogFooter className="mt-4 flex gap-2"><Button variant="outline" onClick={() => setIsCropping(false)}>Back</Button><Button onClick={createCroppedImage} className="bg-green-600 hover:bg-green-700 text-white"><Check className="h-4 w-4 mr-2" /> Apply Crop</Button></DialogFooter>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="grid gap-6 py-4">
-                                <div className="flex flex-col items-center gap-4">
-                                    <div className="relative w-24 h-24 rounded-full border-2 border-dashed border-input bg-muted flex items-center justify-center overflow-hidden group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                        {previewImage ? <img src={previewImage} alt="Preview" className="w-full h-full object-cover" /> : <Camera className="h-8 w-8 text-muted-foreground group-hover:text-foreground transition-colors" />}
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Upload className="h-6 w-6 text-white" /></div>
-                                    </div>
-                                    <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
-                                    <p className="text-xs text-muted-foreground">Click to upload & crop</p>
-                                </div>
-                                <div className="grid gap-2"><Label htmlFor="name">Display Name</Label><Input id="name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
-                                <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" value={editForm.email} readOnly className="bg-muted text-muted-foreground cursor-not-allowed" /></div>
-                            </div>
-                            <DialogFooter><Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button><Button onClick={saveProfile} className="bg-green-600 hover:bg-green-700 text-white">Save Changes</Button></DialogFooter>
-                        </>
-                    )}
                 </DialogContent>
             </Dialog>
+
+
+            {/* --- MAIN UI --- */}
+            <div className="text-center space-y-2">
+                {/* Hidden File Input */}
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={onFileChange}
+                    className="hidden"
+                    accept="image/*"
+                />
+
+                <div className="relative inline-block">
+                    <div className="h-24 w-24 rounded-full bg-gradient-to-tr from-green-400 to-emerald-600 p-[2px]">
+                        <div className="h-full w-full rounded-full bg-zinc-900 flex items-center justify-center overflow-hidden relative">
+                            {avatar ? (
+                                <img src={avatar} alt="Profile" className="h-full w-full object-cover" />
+                            ) : (
+                                <span className="text-3xl font-bold text-white">{name.charAt(0)}</span>
+                            )}
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="absolute bottom-0 right-0 bg-white text-black p-2 rounded-full border-2 border-black cursor-pointer hover:bg-gray-200 transition"
+                    >
+                        <Camera className="h-4 w-4" />
+                    </button>
+                </div>
+
+                {!isEditing ? (
+                    <div>
+                        <h2 className="text-xl font-bold text-white">{name}</h2>
+                        <div className="flex justify-center gap-2 mt-2">
+                            <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-500 text-[10px] font-bold border border-yellow-500/30 flex items-center gap-1">
+                                <Crown className="h-3 w-3" /> PREMIUM
+                            </span>
+                            <button onClick={() => setIsEditing(true)} className="text-xs text-zinc-500 underline ml-2">Edit</button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-2 w-64 pt-2">
+                        <Input
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="text-center bg-zinc-900 border-zinc-700 h-8 text-sm text-white"
+                            placeholder="Enter Name"
+                        />
+                        <Button onClick={handleSaveName} size="sm" className="w-full bg-green-600 h-7 text-xs text-black font-bold">Save Name</Button>
+                    </div>
+                )}
+            </div>
+
+            {/* --- PREMIUM CARD WITH REAL DATA --- */}
+            <div className="relative w-full max-w-sm aspect-[1.586/1] rounded-2xl overflow-hidden shadow-2xl border border-white/10 transition-transform hover:scale-105 duration-300 group">
+                <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black"></div>
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-30"></div>
+                <div className="absolute -top-10 -right-10 h-32 w-32 bg-green-500/20 blur-3xl rounded-full"></div>
+
+                <div className="relative p-6 h-full flex flex-col justify-between">
+                    <div className="flex justify-between items-start">
+                        <div className="h-8 w-11 bg-gradient-to-br from-yellow-200 to-yellow-500 rounded-md border border-white/20 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-1/2 left-0 w-full h-[1px] bg-black/20"></div>
+                            <div className="absolute top-0 left-1/3 w-[1px] h-full bg-black/20"></div>
+                            <div className="absolute top-0 right-1/3 w-[1px] h-full bg-black/20"></div>
+                        </div>
+                        <Wifi className="h-6 w-6 text-white/50 rotate-90" />
+                    </div>
+
+                    <div className="space-y-1">
+                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-medium">Total Balance</span>
+                        <div className="text-2xl font-mono font-bold text-white tracking-tight flex items-center gap-2">
+                            {showBalance ? balance : "••••••"}
+                            <button onClick={() => setShowBalance(!showBalance)} className="opacity-50 hover:opacity-100 transition">
+                                {showBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between items-end">
+                        <div>
+                            <div className="text-[8px] uppercase text-zinc-500 font-bold mb-0.5">Cardholder Name</div>
+                            <div className="font-mono text-sm text-zinc-200 tracking-wider uppercase truncate max-w-[200px]">
+                                {name || "YOUR NAME"}
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-[8px] uppercase text-zinc-500 font-bold mb-0.5">Valid Thru</div>
+                            <div className="font-mono text-sm text-zinc-200 tracking-widest">12/30</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* --- ACTION BUTTONS --- */}
+            <div className="w-full max-w-sm space-y-3">
+                <Button
+                    onClick={generatePDF}
+                    disabled={transactions.length === 0}
+                    variant="outline"
+                    className="w-full border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 text-zinc-300 justify-between h-12"
+                >
+                    <span className="flex items-center gap-2">
+                        <Download className="h-4 w-4" />
+                        {transactions.length === 0 ? "No Transactions Found" : "Download Analysis Statement"}
+                    </span>
+                    <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded">PDF</span>
+                </Button>
+            </div>
+
         </div>
     );
-}
-
-// Helper
-async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<string | null> {
-    const createImage = (url: string) => new Promise<HTMLImageElement>((resolve, reject) => { const image = new Image(); image.addEventListener("load", () => resolve(image)); image.addEventListener("error", (error) => reject(error)); image.setAttribute("crossOrigin", "anonymous"); image.src = url; });
-    const image = await createImage(imageSrc); const canvas = document.createElement("canvas"); const ctx = canvas.getContext("2d"); if (!ctx) return null;
-    canvas.width = pixelCrop.width; canvas.height = pixelCrop.height;
-    ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height);
-    return canvas.toDataURL("image/jpeg");
 }

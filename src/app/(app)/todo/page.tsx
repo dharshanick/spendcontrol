@@ -58,7 +58,7 @@ export default function TodoPage() {
     };
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto pb-24">
+        <div className="space-y-6 pt-24 pb-24 px-4 min-h-screen">
             <div>
                 <h2 className="text-3xl font-bold tracking-tight">Financial Tasks</h2>
                 <p className="text-muted-foreground">Keep track of your bills, savings goals, and reminders.</p>

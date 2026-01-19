@@ -161,17 +161,24 @@ export default function DashboardPage() {
 
                 {/* 1. Add 'justify-center' to center everything */}
                 {/* 2. Add 'pt-4' to push it down from the status bar */}
-                <div className="flex items-center justify-center gap-3 mb-8 pt-16 relative">
-                    {/* The Logo Image */}
+                {/* --- NEW FIXED HEADER (Sticks to top) --- */}
+                <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-3 pt-12 pb-4 bg-background/80 backdrop-blur-md border-b border-white/5">
+
+                    {/* Logo */}
                     <div className="h-10 w-10 bg-green-500/20 rounded-xl flex items-center justify-center">
                         <Wallet className="h-6 w-6 text-green-500" />
                     </div>
 
-                    {/* The Text */}
+                    {/* Text */}
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent">
                         SpendControl
                     </h1>
                 </div>
+
+                {/* --- SPACER (Important!) --- */}
+                {/* Because the header is now "floating", we need this invisible empty space 
+                    so your Quick Actions don't get hidden behind it. */}
+                <div className="pt-24"></div>
 
                 <QuickActions />
 

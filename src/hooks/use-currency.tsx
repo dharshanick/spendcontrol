@@ -3,13 +3,15 @@
 
 import React, { createContext, useContext, useState, ReactNode, useMemo } from 'react';
 
-type Currency = 'INR' | 'USD' | 'EUR';
+type Currency = 'INR' | 'USD' | 'EUR' | 'GBP' | 'JPY';
 type CurrencySymbols = { [key in Currency]: string };
 
 const currencySymbols: CurrencySymbols = {
   INR: '₹',
   USD: '$',
   EUR: '€',
+  GBP: '£',
+  JPY: '¥',
 };
 
 type CurrencyContextType = {

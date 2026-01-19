@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "sonner";
 import AppLock from "@/components/security/app-lock";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,7 @@ export default function RootLayout({
             <AppLock>{children}</AppLock>
           </div>
           <Toaster />
+          <SonnerToaster />
         </ThemeProvider>
       </body>
     </html>

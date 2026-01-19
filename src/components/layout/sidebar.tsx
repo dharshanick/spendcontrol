@@ -38,7 +38,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
         { href: "/income", label: "Income", icon: TrendingUp },
         { href: "/todo", label: "To-Do List", icon: CheckSquare },
         { href: "/reports", label: "Reports", icon: PieChart },
-        { href: "/history", label: "Previous History", icon: History },
+        { href: "/previous-history", label: "Previous History", icon: History },
         { href: "/game", label: "Game", icon: Gamepad2 },
 
         // 2. MOVED ITEMS (Now after Game)

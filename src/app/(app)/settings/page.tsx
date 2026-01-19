@@ -71,7 +71,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-24">
+    <div className="space-y-6 pt-24 pb-24 px-4 min-h-screen">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
         <p className="text-muted-foreground">Manage your app preferences and data.</p>
@@ -103,14 +103,20 @@ export default function SettingsPage() {
           <CardDescription>Choose your preferred currency symbol.</CardDescription>
         </CardHeader>
         <CardContent className="flex gap-4">
-          {['₹', '$', '€', '£', '¥'].map(sym => (
+          {[
+            { code: 'INR', symbol: '₹' },
+            { code: 'USD', symbol: '$' },
+            { code: 'EUR', symbol: '€' },
+            { code: 'GBP', symbol: '£' },
+            { code: 'JPY', symbol: '¥' },
+          ].map((item) => (
             <Button
-              key={sym}
+              key={item.code}
               variant="outline"
-              className={`w-12 h-12 text-lg ${currencySymbol === sym ? 'bg-green-600 text-white border-green-600 hover:bg-green-700 hover:text-white' : ''}`}
-              onClick={() => setCurrency(sym)}
+              className={`w-12 h-12 text-lg ${currencySymbol === item.symbol ? 'bg-green-600 text-white border-green-600 hover:bg-green-700 hover:text-white' : ''}`}
+              onClick={() => setCurrency(item.code as any)}
             >
-              {sym}
+              {item.symbol}
             </Button>
           ))}
         </CardContent>

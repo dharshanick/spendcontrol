@@ -82,7 +82,7 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-24">
+    <div className="space-y-6 pt-24 pb-24 px-4 min-h-screen">
 
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
