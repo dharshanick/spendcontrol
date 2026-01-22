@@ -99,3 +99,40 @@
 html {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
+
+/* --- ADD THIS SECTION FOR MOBILE FIXES --- */
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden; /* Prevent side scrolling */
+  overscroll-behavior-y: none; /* Disables "pull-to-refresh" rubber banding */
+  -webkit-tap-highlight-color: transparent; /* Removes blue tap box on mobile */
+}
+
+/* Ensure the main app container fills the screen exactly */
+body > div:first-child {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Handle "Notch" and Safe Areas (iPhone X+) */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Custom Scrollbar for better mobile feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.3);
+  border-radius: 10px;
+}
