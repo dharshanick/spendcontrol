@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useTransactions } from "@/hooks/use-transactions";
 import { useCurrency } from "@/hooks/use-currency";
 import { format, isWithinInterval, parseISO, startOfMonth, endOfMonth } from "date-fns";
-import { Download, FileText, Calendar, Filter, Loader2 } from "lucide-react";
+import { Download, FileText, Calendar, Filter, Loader2, Share2 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
@@ -41,90 +41,125 @@ export default function ReportsPage() {
     return { income, expense, net: income - expense };
   }, [filteredData]);
 
-  // --- PDF GENERATION LOGIC ---
-  const downloadPDF = () => {
+  // --- PDF GENERATION & SHARE LOGIC ---
+  const handleGenerateReport = async () => {
     if (filteredData.length === 0) {
       toast.error("No transactions found in this date range.");
       return;
     }
 
     setIsGenerating(true);
-    const doc = new jsPDF();
 
-    // 1. Header Section
-    doc.setFillColor(20, 20, 20); // Dark Header
-    doc.rect(0, 0, 210, 40, "F");
+    try {
+      const doc = new jsPDF();
 
-    doc.setTextColor(34, 197, 94); // Green Brand Color
-    doc.setFontSize(22);
-    doc.setFont("helvetica", "bold");
-    doc.text("SpendControl", 14, 20);
+      // 1. Header Section
+      doc.setFillColor(20, 20, 20); // Dark Header
+      doc.rect(0, 0, 210, 40, "F");
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "normal");
-    doc.text("Financial Statement", 14, 30);
+      doc.setTextColor(34, 197, 94); // Green Brand Color
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.text("SpendControl", 14, 20);
 
-    // 2. Period Info
-    doc.setTextColor(100, 100, 100);
-    doc.setFontSize(10);
-    doc.text(`Statement Period: ${format(new Date(startDate), "dd MMM yyyy")} to ${format(new Date(endDate), "dd MMM yyyy")}`, 14, 50);
-    doc.text(`Generated On: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, 14, 55);
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.text("Financial Statement", 14, 30);
 
-    // 3. Summary Box
-    doc.setDrawColor(220, 220, 220);
-    doc.setFillColor(250, 250, 250);
-    doc.roundedRect(14, 65, 180, 25, 3, 3, "FD");
+      // 2. Period Info
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(10);
+      doc.text(`Statement Period: ${format(new Date(startDate), "dd MMM yyyy")} to ${format(new Date(endDate), "dd MMM yyyy")}`, 14, 50);
+      doc.text(`Generated On: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, 14, 55);
 
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Total Income", 20, 75);
-    doc.text("Total Expense", 80, 75);
-    doc.text("Net Savings", 140, 75);
+      // 3. Summary Box
+      doc.setDrawColor(220, 220, 220);
+      doc.setFillColor(250, 250, 250);
+      doc.roundedRect(14, 65, 180, 25, 3, 3, "FD");
 
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(22, 163, 74); // Green
-    doc.text(`+ ${currencySymbol}${totals.income.toLocaleString()}`, 20, 83);
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Total Income", 20, 75);
+      doc.text("Total Expense", 80, 75);
+      doc.text("Net Savings", 140, 75);
 
-    doc.setTextColor(220, 38, 38); // Red
-    doc.text(`- ${currencySymbol}${totals.expense.toLocaleString()}`, 80, 83);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(22, 163, 74); // Green
+      doc.text(`+ ${currencySymbol}${totals.income.toLocaleString()}`, 20, 83);
 
-    doc.setTextColor(0, 0, 0); // Black
-    doc.text(`${currencySymbol}${totals.net.toLocaleString()}`, 140, 83);
+      doc.setTextColor(220, 38, 38); // Red
+      doc.text(`- ${currencySymbol}${totals.expense.toLocaleString()}`, 80, 83);
 
-    // 4. Transaction Table
-    const tableRows = filteredData.map(t => [
-      format(new Date(t.date), "dd/MM/yyyy"),
-      t.title,
-      t.category,
-      t.type.toUpperCase(),
-      `${t.type === 'income' ? '+' : '-'} ${t.amount}`
-    ]);
+      doc.setTextColor(0, 0, 0); // Black
+      doc.text(`${currencySymbol}${totals.net.toLocaleString()}`, 140, 83);
 
-    autoTable(doc, {
-      startY: 100,
-      head: [['Date', 'Description', 'Category', 'Type', `Amount (${currencySymbol})`]],
-      body: tableRows,
-      theme: 'striped',
-      headStyles: { fillColor: [34, 197, 94] }, // Green Header
-      styles: { fontSize: 9 },
-      alternateRowStyles: { fillColor: [245, 245, 245] }
-    });
+      // 4. Transaction Table
+      const tableRows = filteredData.map(t => [
+        format(new Date(t.date), "dd/MM/yyyy"),
+        t.title,
+        t.category,
+        t.type.toUpperCase(),
+        `${t.type === 'income' ? '+' : '-'} ${t.amount}`
+      ]);
 
-    // 5. Footer
-    const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(`SpendControl App - Confidential Financial Report`, 14, doc.internal.pageSize.height - 10);
-      doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 10);
+      autoTable(doc, {
+        startY: 100,
+        head: [['Date', 'Description', 'Category', 'Type', `Amount (${currencySymbol})`]],
+        body: tableRows,
+        theme: 'striped',
+        headStyles: { fillColor: [34, 197, 94] },
+        styles: { fontSize: 9 },
+        alternateRowStyles: { fillColor: [245, 245, 245] }
+      });
+
+      // 5. Footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`SpendControl App - Confidential Financial Report`, 14, doc.internal.pageSize.height - 10);
+        doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 10);
+      }
+
+      const fileName = `Statement_${startDate}_to_${endDate}.pdf`;
+
+      // --- SHARE LOGIC ---
+      // Create a File object from the generated PDF
+      const pdfBlob = doc.output('blob');
+      const file = new File([pdfBlob], fileName, { type: "application/pdf" });
+
+      // Check if the browser supports sharing files (Works on most Android/iOS devices)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            title: 'SpendControl Statement',
+            text: `Here is my financial statement from ${startDate} to ${endDate}.`,
+            files: [file],
+          });
+          toast.success("Shared successfully!");
+        } catch (error) {
+          if ((error as any).name !== 'AbortError') {
+            console.error('Error sharing:', error);
+            // If share fails, fallback to download
+            doc.save(fileName);
+            toast.success("Statement downloaded!");
+          }
+        }
+      } else {
+        // Fallback for Desktop or browsers that don't support sharing
+        doc.save(fileName);
+        toast.success("Statement downloaded!");
+      }
+
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to generate report.");
+    } finally {
+      setIsGenerating(false);
     }
-
-    doc.save(`Statement_${startDate}_to_${endDate}.pdf`);
-    setIsGenerating(false);
-    toast.success("Statement downloaded successfully!");
   };
 
   return (
@@ -132,7 +167,7 @@ export default function ReportsPage() {
     <div className="space-y-6 pb-24 px-4 md:px-0 pt-24 md:pt-6">
       <div>
         <h1 className="text-3xl font-bold">Reports & Statements</h1>
-        <p className="text-muted-foreground mt-1">Select a date range to generate and download your custom financial statement.</p>
+        <p className="text-muted-foreground mt-1">Select a date range to generate and share your financial statement.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -183,16 +218,16 @@ export default function ReportsPage() {
             </div>
 
             <Button
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12"
-              onClick={downloadPDF}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12 transition-all active:scale-95"
+              onClick={handleGenerateReport}
               disabled={isGenerating || filteredData.length === 0}
             >
               {isGenerating ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Download className="mr-2 h-4 w-4" />
+                <Share2 className="mr-2 h-4 w-4" />
               )}
-              {isGenerating ? "Generating..." : "Download Statement PDF"}
+              {isGenerating ? "Generating..." : "Download & Share PDF"}
             </Button>
           </CardContent>
         </Card>

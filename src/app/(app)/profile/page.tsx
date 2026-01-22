@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -21,26 +21,15 @@ import getCroppedImg from "@/lib/cropImage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { useUser } from "@/hooks/use-user";
+import { useTransactions } from "@/hooks/use-transactions"; // IMPORTED LIVE DATA HOOK
 import Link from "next/link";
-
-// --- TYPE DEFINITION ---
-interface Transaction {
-    id: string;
-    title: string;
-    amount: number;
-    type: "income" | "expense";
-    date: string;
-    category: string;
-}
 
 export default function ProfilePage() {
     const { user, updateUser } = useUser();
+    const { transactions } = useTransactions(); // GET LIVE TRANSACTIONS
+
     const [isEditingName, setIsEditingName] = useState(false);
     const [tempName, setTempName] = useState("");
-    const [balance, setBalance] = useState(0);
-    const [income, setIncome] = useState(0);
-    const [expense, setExpense] = useState(0);
-    const [hasTransactions, setHasTransactions] = useState(false);
 
     // Cropper State
     const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -50,18 +39,24 @@ export default function ProfilePage() {
     const [isCropperOpen, setIsCropperOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        const savedTxns = localStorage.getItem("transactions");
-        if (savedTxns) {
-            const parsedTxns: Transaction[] = JSON.parse(savedTxns);
-            setHasTransactions(parsedTxns.length > 0);
-            const totalIncome = parsedTxns.filter(t => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
-            const totalExpense = parsedTxns.filter(t => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
-            setIncome(totalIncome);
-            setExpense(totalExpense);
-            setBalance(totalIncome - totalExpense);
-        }
-    }, []);
+    // --- 1. CALCULATE LIVE FINANCIALS ---
+    // This replaces the old localStorage logic. It auto-updates whenever you add income/expense.
+    const { income, expense, balance, hasTransactions } = useMemo(() => {
+        const totalIncome = transactions
+            .filter((t) => t.type === "income")
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        const totalExpense = transactions
+            .filter((t) => t.type === "expense")
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        return {
+            income: totalIncome,
+            expense: totalExpense,
+            balance: totalIncome - totalExpense, // This matches your Dashboard Savings
+            hasTransactions: transactions.length > 0
+        };
+    }, [transactions]);
 
     const handleSaveName = () => {
         if (!tempName.trim()) return;
@@ -120,7 +115,6 @@ export default function ProfilePage() {
     ];
 
     return (
-        /* UPDATED: Increased top padding to pt-24 specifically for mobile to clear the menu button */
         <div className="min-h-screen bg-gray-50 dark:bg-black text-zinc-900 dark:text-white pb-32 pt-24 md:pt-8 transition-colors duration-300">
 
             {/* HEADER WITH SETTINGS LINK */}
@@ -139,9 +133,7 @@ export default function ProfilePage() {
              bg-gradient-to-br from-gray-200 via-gray-100 to-gray-300 dark:from-[#1a1a1a] dark:to-[#050505]
              border border-black/5 dark:border-white/10 transition-colors duration-300">
 
-                    {/* Noise Texture */}
                     <div className="absolute inset-0 opacity-30 dark:opacity-15 pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
-                    {/* Glow Effect */}
                     <div className="absolute -right-24 -top-24 h-64 w-64 md:h-80 md:w-80 bg-white/40 dark:bg-white/5 blur-3xl rounded-full pointer-events-none"></div>
 
                     {/* TOP ROW */}
@@ -171,7 +163,7 @@ export default function ProfilePage() {
                         </div>
                     </div>
 
-                    {/* MIDDLE: BALANCE */}
+                    {/* MIDDLE: BALANCE (NOW LIVE!) */}
                     <div className="z-10 mt-2 md:mt-4">
                         <h3 className="text-zinc-500 text-[10px] md:text-sm font-medium uppercase tracking-wider mb-1 md:mb-2">Total Balance</h3>
                         <div className="text-4xl md:text-7xl font-bold text-zinc-900 dark:text-white tracking-tight break-words">
@@ -189,7 +181,7 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                {/* === STATS === */}
+                {/* === STATS (NOW LIVE!) === */}
                 <div className="grid grid-cols-2 gap-4 md:gap-6">
                     <div className="bg-white dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 rounded-2xl p-4 md:p-6 flex flex-col justify-between hover:bg-gray-50 dark:hover:bg-zinc-900/80 transition shadow-sm">
                         <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-green-500/10 flex items-center justify-center mb-2 md:mb-4 border border-green-500/20">
