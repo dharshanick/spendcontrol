@@ -14,7 +14,6 @@ import {
     Gamepad2,
     User,
     Settings,
-    Clock,
     ScrollText,
     Eye,
     EyeOff
@@ -31,7 +30,6 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
     const { isPrivacyMode, togglePrivacy } = usePrivacy();
 
     const links = [
-        // 1. Core Features
         { href: "/dashboard", label: "Home", icon: LayoutDashboard },
         { href: "/budgets", label: "Budgets", icon: Wallet },
         { href: "/expenses", label: "Expenses", icon: Receipt },
@@ -40,12 +38,7 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
         { href: "/reports", label: "Reports", icon: PieChart },
         { href: "/previous-history", label: "Previous History", icon: History },
         { href: "/game", label: "Game", icon: Gamepad2 },
-
-        // 2. MOVED ITEMS (Now after Game)
-        { href: "/recent-transactions", label: "Recent Transactions", icon: Clock },
         { href: "/budget-history", label: "Budget History", icon: ScrollText },
-
-        // 3. User Settings
         { href: "/profile", label: "Profile", icon: User },
         { href: "/settings", label: "Settings", icon: Settings },
     ];
@@ -53,10 +46,9 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
     return (
         <div className="flex flex-col h-full bg-card border-r w-72">
 
-            {/* --- DYNAMIC LOGO SECTION --- */}
-            <div className="p-6 flex items-center gap-3">
+            {/* --- LOGO SECTION --- */}
+            <div className="p-6 pb-2 flex items-center gap-3">
                 <div className="relative h-9 w-9">
-                    {/* 1. LIGHT MODE: Shows Dark Logo */}
                     <Image
                         src="/logo-dark.png"
                         alt="Logo"
@@ -65,7 +57,6 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
                         className="object-contain dark:hidden"
                         priority
                     />
-                    {/* 2. DARK MODE: Shows Light Logo */}
                     <Image
                         src="/logo-light.png"
                         alt="Logo"
@@ -80,8 +71,8 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
                 </span>
             </div>
 
-            {/* Navigation Links */}
-            <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+            {/* Navigation Links - Added mt-4 to push the list down from the logo */}
+            <nav className="flex-1 px-4 py-4 mt-4 space-y-2 overflow-y-auto">
                 {links.map((link) => {
                     const Icon = link.icon;
                     const isActive = pathname === link.href;
@@ -104,8 +95,8 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
                 })}
             </nav>
 
-            {/* Footer User Card WITH PRIVACY TOGGLE */}
-            <div className="p-4 border-t">
+            {/* Footer User Card */}
+            <div className="p-4 border-t mt-auto">
                 <div className="flex items-center gap-3 px-2 py-2 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-emerald-700 flex items-center justify-center text-xs font-bold text-white shadow-lg">
                         N
@@ -114,8 +105,6 @@ export default function Sidebar({ onLinkClick }: SidebarProps) {
                         <p className="text-sm font-medium truncate">My Account</p>
                         <p className="text-xs text-muted-foreground truncate">Free Plan</p>
                     </div>
-
-                    {/* PRIVACY BUTTON */}
                     <button
                         onClick={togglePrivacy}
                         className="p-2 rounded-lg hover:bg-zinc-800 text-muted-foreground hover:text-white transition-colors"

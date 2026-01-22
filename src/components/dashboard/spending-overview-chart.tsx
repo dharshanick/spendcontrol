@@ -6,26 +6,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCurrency } from "@/hooks/use-currency";
 import { useTransactions } from "@/hooks/use-transactions";
-import { startOfWeek, endOfWeek, eachDayOfInterval, format, isSameDay, startOfMonth, endOfMonth, startOfYear, endOfYear, eachMonthOfInterval } from "date-fns";
+import {
+    startOfWeek, endOfWeek, eachDayOfInterval, format, isSameDay,
+    startOfMonth, endOfMonth, startOfYear, endOfYear, eachMonthOfInterval
+} from "date-fns";
 
-export default function SpendingOverviewChart({ referenceDate, weekStartDate, weekEndDate }: { referenceDate?: Date, weekStartDate?: Date, weekEndDate?: Date }) {
+export default function SpendingOverviewChart({ referenceDate }: { referenceDate?: Date }) {
     const { currencySymbol } = useCurrency();
     const { transactions } = useTransactions();
     const [timeRange, setTimeRange] = useState("Weekly");
     const [isMounted, setIsMounted] = useState(false);
 
-    // Prevent hydration mismatch
     useEffect(() => {
         setIsMounted(true);
     }, []);
 
     const chartData = useMemo(() => {
+        // ALGORITHM: Always anchor to the current reference date (Today)
         const today = referenceDate || new Date();
         let data = [];
 
         if (timeRange === "Weekly") {
-            // FIX: Force the week to start on Monday (1) and end on Sunday
-            // We ignore the props weekStartDate/EndDate to ensure this visual fix works independently
+            // 1. WEEKLY LOGIC: Monday to Sunday of the CURRENT week
+            // Automatically resets when the new week begins
             const start = startOfWeek(today, { weekStartsOn: 1 });
             const end = endOfWeek(today, { weekStartsOn: 1 });
             const days = eachDayOfInterval({ start, end });
@@ -36,12 +39,14 @@ export default function SpendingOverviewChart({ referenceDate, weekStartDate, we
                     .reduce((sum, t) => sum + t.amount, 0);
 
                 return {
-                    day: format(day, "EEE"), // Mon, Tue, Wed...
+                    day: format(day, "EEE"), // Mon, Tue...
                     fullDate: format(day, "yyyy-MM-dd"),
                     amount
                 };
             });
         } else if (timeRange === "Monthly") {
+            // 2. MONTHLY LOGIC: 1st to Last day of CURRENT Month
+            // Automatically resets on the 1st of next month
             const start = startOfMonth(today);
             const end = endOfMonth(today);
             const days = eachDayOfInterval({ start, end });
@@ -51,22 +56,26 @@ export default function SpendingOverviewChart({ referenceDate, weekStartDate, we
                     .filter(t => t.type === 'expense' && isSameDay(new Date(t.date), day))
                     .reduce((sum, t) => sum + t.amount, 0);
                 return {
-                    day: format(day, "d"),
+                    day: format(day, "d"), // 1, 2, 3...
                     amount
                 };
             });
         } else {
-            // Yearly
+            // 3. YEARLY LOGIC: Jan 1 to Dec 31 of CURRENT Year
             const start = startOfYear(today);
             const end = endOfYear(today);
             const months = eachMonthOfInterval({ start, end });
 
             data = months.map(month => {
                 const amount = transactions
-                    .filter(t => t.type === 'expense' && new Date(t.date).getMonth() === month.getMonth() && new Date(t.date).getFullYear() === month.getFullYear())
+                    .filter(t =>
+                        t.type === 'expense' &&
+                        new Date(t.date).getMonth() === month.getMonth() &&
+                        new Date(t.date).getFullYear() === month.getFullYear()
+                    )
                     .reduce((sum, t) => sum + t.amount, 0);
                 return {
-                    day: format(month, "MMM"),
+                    day: format(month, "MMM"), // Jan, Feb...
                     amount
                 };
             });
@@ -110,7 +119,6 @@ export default function SpendingOverviewChart({ referenceDate, weekStartDate, we
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" className="stroke-muted/20" vertical={false} />
-
                             <XAxis
                                 dataKey="day"
                                 tickLine={false}
@@ -120,7 +128,6 @@ export default function SpendingOverviewChart({ referenceDate, weekStartDate, we
                                 padding={{ left: 20, right: 20 }}
                                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                             />
-
                             <YAxis
                                 tickLine={false}
                                 axisLine={false}
@@ -128,7 +135,6 @@ export default function SpendingOverviewChart({ referenceDate, weekStartDate, we
                                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                                 width={35}
                             />
-
                             <Tooltip
                                 content={({ active, payload }) => {
                                     if (active && payload && payload.length) {
@@ -150,7 +156,6 @@ export default function SpendingOverviewChart({ referenceDate, weekStartDate, we
                                     return null;
                                 }}
                             />
-
                             <Area
                                 type="monotone"
                                 dataKey="amount"

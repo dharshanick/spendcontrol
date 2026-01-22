@@ -1,201 +1,238 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, Wallet, Download } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useCurrency } from "@/hooks/use-currency";
-import { format } from "date-fns";
+import { format, isWithinInterval, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { Download, FileText, Calendar, Filter, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { saveAndOpenPDF } from "@/lib/download-helper";
+import { toast } from "sonner";
 
 export default function ReportsPage() {
   const { transactions } = useTransactions();
   const { currencySymbol } = useCurrency();
 
-  // --- CALCULATE TOTALS ---
-  const totalIncome = transactions
-    .filter((t) => t.type === "income")
-    .reduce((acc, t) => acc + t.amount, 0);
+  // Default to current month
+  const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
+  const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  const totalExpense = transactions
-    .filter((t) => t.type === "expense")
-    .reduce((acc, t) => acc + t.amount, 0);
+  // Filter transactions based on selected range
+  const filteredData = useMemo(() => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    // Set end date time to end of day to include transactions on that day
+    end.setHours(23, 59, 59, 999);
 
-  const totalSavings = totalIncome - totalExpense;
-  const savingsRate = totalIncome > 0 ? ((totalSavings / totalIncome) * 100).toFixed(1) : "0";
+    return transactions.filter((t) => {
+      const tDate = parseISO(t.date);
+      return isWithinInterval(tDate, { start, end });
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, startDate, endDate]);
 
-  // --- PDF GENERATOR ---
-  const generatePDF = async () => {
+  // Calculate totals for the selected period
+  const totals = useMemo(() => {
+    const income = filteredData.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const expense = filteredData.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    return { income, expense, net: income - expense };
+  }, [filteredData]);
+
+  // --- PDF GENERATION LOGIC ---
+  const downloadPDF = () => {
+    if (filteredData.length === 0) {
+      toast.error("No transactions found in this date range.");
+      return;
+    }
+
+    setIsGenerating(true);
     const doc = new jsPDF();
-    const formatMoney = (amt: number) => `INR ${amt.toLocaleString()}`;
 
-    // Header
+    // 1. Header Section
+    doc.setFillColor(20, 20, 20); // Dark Header
+    doc.rect(0, 0, 210, 40, "F");
+
+    doc.setTextColor(34, 197, 94); // Green Brand Color
     doc.setFontSize(22);
-    doc.setTextColor("#16a34a");
     doc.setFont("helvetica", "bold");
     doc.text("SpendControl", 14, 20);
 
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.setFont("helvetica", "normal");
-    doc.text("Full Financial Report", 14, 26);
-
-    doc.setDrawColor(200);
-    doc.line(14, 32, 196, 32);
-
-    // Summary Section
-    doc.setFillColor(245, 245, 245);
-    doc.roundedRect(14, 40, 182, 40, 2, 2, "F");
-
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(12);
-    doc.setTextColor(0);
-    doc.setFont("helvetica", "bold");
-    doc.text("Executive Summary", 20, 50);
+    doc.setFont("helvetica", "normal");
+    doc.text("Financial Statement", 14, 30);
+
+    // 2. Period Info
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(10);
+    doc.text(`Statement Period: ${format(new Date(startDate), "dd MMM yyyy")} to ${format(new Date(endDate), "dd MMM yyyy")}`, 14, 50);
+    doc.text(`Generated On: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, 14, 55);
+
+    // 3. Summary Box
+    doc.setDrawColor(220, 220, 220);
+    doc.setFillColor(250, 250, 250);
+    doc.roundedRect(14, 65, 180, 25, 3, 3, "FD");
 
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Total Income: ${formatMoney(totalIncome)}`, 20, 60);
-    doc.text(`Total Expense: ${formatMoney(totalExpense)}`, 20, 68);
-    doc.text(`Net Savings: ${formatMoney(totalSavings)}`, 20, 76);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Total Income", 20, 75);
+    doc.text("Total Expense", 80, 75);
+    doc.text("Net Savings", 140, 75);
 
-    // Table
-    const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const tableData = sortedTransactions.map(t => [
-      format(new Date(t.date), "yyyy-MM-dd"),
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(22, 163, 74); // Green
+    doc.text(`+ ${currencySymbol}${totals.income.toLocaleString()}`, 20, 83);
+
+    doc.setTextColor(220, 38, 38); // Red
+    doc.text(`- ${currencySymbol}${totals.expense.toLocaleString()}`, 80, 83);
+
+    doc.setTextColor(0, 0, 0); // Black
+    doc.text(`${currencySymbol}${totals.net.toLocaleString()}`, 140, 83);
+
+    // 4. Transaction Table
+    const tableRows = filteredData.map(t => [
+      format(new Date(t.date), "dd/MM/yyyy"),
       t.title,
       t.category,
       t.type.toUpperCase(),
-      `${t.type === 'income' ? '+' : '-'} ${t.amount.toLocaleString()}`
+      `${t.type === 'income' ? '+' : '-'} ${t.amount}`
     ]);
 
     autoTable(doc, {
-      startY: 90,
-      head: [["Date", "Description", "Category", "Type", "Amount (INR)"]],
-      body: tableData,
-      theme: "grid",
-      headStyles: { fillColor: [22, 163, 74] },
+      startY: 100,
+      head: [['Date', 'Description', 'Category', 'Type', `Amount (${currencySymbol})`]],
+      body: tableRows,
+      theme: 'striped',
+      headStyles: { fillColor: [34, 197, 94] }, // Green Header
+      styles: { fontSize: 9 },
+      alternateRowStyles: { fillColor: [245, 245, 245] }
     });
 
-    await saveAndOpenPDF(doc, `SpendControl_Report_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+    // 5. Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`SpendControl App - Confidential Financial Report`, 14, doc.internal.pageSize.height - 10);
+      doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 10);
+    }
+
+    doc.save(`Statement_${startDate}_to_${endDate}.pdf`);
+    setIsGenerating(false);
+    toast.success("Statement downloaded successfully!");
   };
 
   return (
-    <div className="space-y-6 pt-24 pb-24 px-4 min-h-screen">
-
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Financial Reports</h2>
-          <p className="text-muted-foreground">A detailed breakdown of your wealth and spending.</p>
-        </div>
-        <Button onClick={generatePDF} className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/20">
-          <Download className="h-4 w-4 mr-2" /> Download PDF Report
-        </Button>
+    /* UPDATED: Added pt-24 for mobile to push content below the menu button */
+    <div className="space-y-6 pb-24 px-4 md:px-0 pt-24 md:pt-6">
+      <div>
+        <h1 className="text-3xl font-bold">Reports & Statements</h1>
+        <p className="text-muted-foreground mt-1">Select a date range to generate and download your custom financial statement.</p>
       </div>
 
-      {/* 1. BIG SUMMARY CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid gap-6 md:grid-cols-2">
 
-        {/* INCOME CARD */}
-        <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-green-500 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" /> Total Income
+        {/* --- CONTROL PANEL --- */}
+        <Card className="shadow-lg border-zinc-200 dark:border-zinc-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5 text-green-500" />
+              Report Settings
             </CardTitle>
+            <CardDescription>Choose the duration for your statement.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-500">
-              {currencySymbol}{totalIncome.toLocaleString()}
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Start Date</label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="bg-zinc-50 dark:bg-zinc-900"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">End Date</label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="bg-zinc-50 dark:bg-zinc-900"
+                />
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">All time earnings</p>
+
+            {/* Summary Preview */}
+            <div className="p-4 bg-zinc-100 dark:bg-zinc-900/50 rounded-xl space-y-3 border border-zinc-200 dark:border-zinc-800">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Transactions found:</span>
+                <span className="font-bold">{filteredData.length}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Net Balance:</span>
+                <span className={`font-bold ${totals.net >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {currencySymbol}{totals.net.toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12"
+              onClick={downloadPDF}
+              disabled={isGenerating || filteredData.length === 0}
+            >
+              {isGenerating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              {isGenerating ? "Generating..." : "Download Statement PDF"}
+            </Button>
           </CardContent>
         </Card>
 
-        {/* EXPENSE CARD */}
-        <Card className="bg-gradient-to-br from-red-500/10 to-orange-500/5 border-red-500/20">
+        {/* --- PREVIEW LIST --- */}
+        <Card className="h-[400px] flex flex-col shadow-lg border-zinc-200 dark:border-zinc-800">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-red-500 flex items-center gap-2">
-              <TrendingDown className="h-4 w-4" /> Total Spent
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-500" />
+              Preview Data
             </CardTitle>
+            <CardDescription>Transactions included in this report.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-red-500">
-              {currencySymbol}{totalExpense.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">All time expenses</p>
-          </CardContent>
-        </Card>
-
-        {/* SAVINGS CARD */}
-        <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/5 border-blue-500/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-500 flex items-center gap-2">
-              <Wallet className="h-4 w-4" /> Net Savings
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-500">
-              {currencySymbol}{totalSavings.toLocaleString()}
-            </div>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs font-bold bg-blue-500/20 text-blue-600 px-1.5 py-0.5 rounded">
-                {savingsRate}% Saved
-              </span>
-              <p className="text-xs text-muted-foreground">of total income</p>
-            </div>
+          <CardContent className="flex-1 overflow-y-auto pr-2 space-y-2">
+            {filteredData.length > 0 ? (
+              filteredData.map((t) => (
+                <div key={t.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center ${t.type === 'income' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}`}>
+                      {t.type === 'income' ? '+' : '-'}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium truncate max-w-[120px]">{t.title}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(t.date), "dd MMM")}</p>
+                    </div>
+                  </div>
+                  <span className={`text-sm font-bold ${t.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-zinc-900 dark:text-white'}`}>
+                    {currencySymbol}{t.amount}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground space-y-2 opacity-50">
+                <Calendar className="h-10 w-10" />
+                <p className="text-sm">No transactions in range</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
-
-      {/* 2. VISUAL BREAKDOWN */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Cash Flow Visualization</CardTitle>
-          <CardDescription>Visual representation of your income vs expenses.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          {/* Income Bar */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="font-medium flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-500"></div> Income</span>
-              <span>{currencySymbol}{totalIncome.toLocaleString()}</span>
-            </div>
-            <div className="h-3 w-full bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
-              <div className="h-full bg-green-500 w-full animate-in slide-in-from-left duration-1000"></div>
-            </div>
-          </div>
-
-          {/* Expense Bar */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="font-medium flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red-500"></div> Expenses</span>
-              <span>{currencySymbol}{totalExpense.toLocaleString()}</span>
-            </div>
-            <div className="h-3 w-full bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-red-500 transition-all duration-1000"
-                style={{ width: `${totalIncome > 0 ? Math.min((totalExpense / totalIncome) * 100, 100) : 0}%` }}
-              ></div>
-            </div>
-          </div>
-
-          {/* Savings Bar */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="font-medium flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div> Remaining Savings</span>
-              <span>{currencySymbol}{totalSavings.toLocaleString()}</span>
-            </div>
-            <div className="h-3 w-full bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blue-500 transition-all duration-1000"
-                style={{ width: `${totalIncome > 0 ? Math.min((totalSavings / totalIncome) * 100, 100) : 0}%` }}
-              ></div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

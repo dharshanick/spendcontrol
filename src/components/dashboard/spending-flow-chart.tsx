@@ -6,21 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCurrency } from "@/hooks/use-currency";
 import { useTransactions } from "@/hooks/use-transactions";
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
+import {
+  startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+  startOfYear, endOfYear, isWithinInterval, parseISO
+} from "date-fns";
 
-// --- VIBRANT COLOR PALETTE ---
 const COLORS = [
-  "#22c55e", // Green
-  "#3b82f6", // Blue
-  "#eab308", // Yellow
-  "#f97316", // Orange
-  "#a855f7", // Purple
-  "#ec4899", // Pink
-  "#06b6d4", // Cyan
-  "#ef4444", // Red
+  "#22c55e", "#3b82f6", "#eab308", "#f97316",
+  "#a855f7", "#ec4899", "#06b6d4", "#ef4444",
 ];
 
-export default function SpendingFlowChart({ weeklyBudgets, monthlyBudgets, currentDate }: any) {
+export default function SpendingFlowChart({ currentDate }: { currentDate: Date }) {
   const { currencySymbol } = useCurrency();
   const { transactions } = useTransactions();
   const [timeRange, setTimeRange] = useState("Monthly");
@@ -29,34 +25,36 @@ export default function SpendingFlowChart({ weeklyBudgets, monthlyBudgets, curre
     const today = currentDate || new Date();
     let start, end;
 
-    // 1. Determine Date Range
+    // ALGORITHM: Determine Date Range strictly based on 'today'
     if (timeRange === "Weekly") {
       start = startOfWeek(today, { weekStartsOn: 1 });
       end = endOfWeek(today, { weekStartsOn: 1 });
-    } else {
+    } else if (timeRange === "Monthly") {
       start = startOfMonth(today);
       end = endOfMonth(today);
+    } else {
+      // Yearly
+      start = startOfYear(today);
+      end = endOfYear(today);
     }
 
-    // 2. Filter Expenses for this range
+    // Filter Expenses only within the calculated window
     const relevantTransactions = transactions.filter(
       (t) => t.type === "expense" && isWithinInterval(parseISO(t.date), { start, end })
     );
 
-    // 3. Group by Category
+    // Group by Category
     const categoryMap: Record<string, number> = {};
     relevantTransactions.forEach((t) => {
       const cat = t.category || "Uncategorized";
       categoryMap[cat] = (categoryMap[cat] || 0) + t.amount;
     });
 
-    // 4. Convert to Array for Chart
     const data: { name: string; value: number; isEmpty?: boolean }[] = Object.entries(categoryMap).map(([name, value]) => ({
       name,
       value,
     }));
 
-    // 5. Handle "No Data" case
     if (data.length === 0) {
       return [{ name: "No spending data", value: 1, isEmpty: true }];
     }
@@ -76,6 +74,7 @@ export default function SpendingFlowChart({ weeklyBudgets, monthlyBudgets, curre
             <SelectContent>
               <SelectItem value="Weekly">Weekly</SelectItem>
               <SelectItem value="Monthly">Monthly</SelectItem>
+              <SelectItem value="Yearly">Yearly</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -97,7 +96,7 @@ export default function SpendingFlowChart({ weeklyBudgets, monthlyBudgets, curre
                 dataKey="value"
                 stroke="none"
               >
-                {chartData.map((entry, index) => (
+                {chartData.map((entry: any, index: number) => (
                   <Cell
                     key={`cell-${index}`}
                     fill={entry.isEmpty ? "#333" : COLORS[index % COLORS.length]}
@@ -118,14 +117,12 @@ export default function SpendingFlowChart({ weeklyBudgets, monthlyBudgets, curre
                 verticalAlign="bottom"
                 height={36}
                 iconType="circle"
-                formatter={(value, entry: any) => (
+                formatter={(value) => (
                   <span className="text-xs text-muted-foreground ml-1">{value}</span>
                 )}
               />
             </PieChart>
           </ResponsiveContainer>
-
-          {/* Center Text if Empty */}
           {chartData[0].isEmpty && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span className="text-xs text-muted-foreground">No spending data</span>

@@ -157,28 +157,20 @@ export default function DashboardPage() {
     return (
         <>
             <ReminderModal />
-            <div className="space-y-6 pb-24">
+            <div className="space-y-6 pb-24 md:pb-0 md:pt-4">
 
-                {/* 1. Add 'justify-center' to center everything */}
-                {/* 2. Add 'pt-4' to push it down from the status bar */}
-                {/* --- NEW FIXED HEADER (Sticks to top) --- */}
-                <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-3 pt-12 pb-4 bg-background/80 backdrop-blur-md border-b border-white/5">
-
-                    {/* Logo */}
+                {/* --- FIXED MOBILE HEADER (HIDDEN ON DESKTOP) --- */}
+                <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-3 pt-12 pb-4 bg-background/80 backdrop-blur-md border-b border-white/5 md:hidden">
                     <div className="h-10 w-10 bg-green-500/20 rounded-xl flex items-center justify-center">
                         <Wallet className="h-6 w-6 text-green-500" />
                     </div>
-
-                    {/* Text */}
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent">
                         SpendControl
                     </h1>
                 </div>
 
-                {/* --- SPACER (Important!) --- */}
-                {/* Because the header is now "floating", we need this invisible empty space 
-                    so your Quick Actions don't get hidden behind it. */}
-                <div className="pt-24"></div>
+                {/* Spacer for mobile only */}
+                <div className="pt-24 md:hidden"></div>
 
                 <QuickActions />
 
@@ -216,10 +208,15 @@ export default function DashboardPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="md:col-span-2">
-                        <SpendingOverviewChart referenceDate={currentDate} weekStartDate={weeklyInterval.start} weekEndDate={weeklyInterval.end} />
+                        {/* Passing referenceDate ensures the chart uses the dashboard's time.
+                            Note: The chart now handles the "Weekly/Monthly/Yearly" logic internally 
+                            but respects this date as "Today".
+                        */}
+                        <SpendingOverviewChart referenceDate={currentDate} />
                     </div>
                     <div className="md:col-span-1">
-                        <SpendingFlowChart weeklyBudgets={selectableWeeklyBudgets} monthlyBudgets={selectableMonthlyBudgets} currentDate={currentDate} />
+                        {/* Passing currentDate ensures the flow chart resets correctly */}
+                        <SpendingFlowChart currentDate={currentDate} />
                     </div>
                 </div>
 
