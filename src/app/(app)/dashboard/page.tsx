@@ -16,10 +16,6 @@ import ReminderModal from "@/components/reminders/reminder-modal";
 import type { Budget, Transaction } from "@/lib/types";
 import QuickActions from "@/components/dashboard/quick-actions";
 
-// --- NEW IMPORTS FOR MODALS ---
-import AddIncomeModal from "@/components/shared/add-income-modal";
-import AddExpenseModal from "@/components/shared/add-expense-modal";
-
 const calculatePercentageChange = (current: number, previous: number) => {
     if (previous === 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous) * 100;
@@ -31,8 +27,6 @@ export default function DashboardPage() {
 
     // --- STATE FOR MODALS ---
     const [editingBalance, setEditingBalance] = useState<"total" | "monthly" | "income" | null>(null);
-    const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
-    const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
 
     const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -123,10 +117,10 @@ export default function DashboardPage() {
     return (
         <>
             <ReminderModal />
-            <div className="space-y-6 pb-24 md:pb-0 md:pt-4">
+            <div className="pt-16 pb-24 md:pb-0 md:pt-4">
 
                 {/* --- FIXED MOBILE HEADER --- */}
-                <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-3 pt-12 pb-4 bg-background/80 backdrop-blur-md border-b border-white/5 md:hidden">
+                <div className="fixed top-0 left-0 right-0 z-40 h-16 flex items-center justify-center gap-3 bg-background/80 backdrop-blur-md border-b border-white/5 md:hidden">
                     <div className="h-10 w-10 bg-green-500/20 rounded-xl flex items-center justify-center">
                         <Wallet className="h-6 w-6 text-green-500" />
                     </div>
@@ -135,14 +129,8 @@ export default function DashboardPage() {
                     </h1>
                 </div>
 
-                {/* --- REDUCED SPACER (pt-20 instead of pt-24) to close gap --- */}
-                <div className="pt-20 md:hidden"></div>
-
                 {/* Quick Actions with Props passed down */}
-                <QuickActions
-                    onAddIncome={() => setIsIncomeModalOpen(true)}
-                    onAddExpense={() => setIsExpenseModalOpen(true)}
-                />
+                <QuickActions />
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-3">
                     <SummaryCard title={hasTransactions ? `${monthName}'s Income` : "Income"} amount={monthlySummary.thisMonthIncome} comparison={monthlySummary.incomeComparison} icon={<IndianRupee className="h-5 w-5 text-muted-foreground" />} onEdit={() => setEditingBalance('income')} />
@@ -191,9 +179,6 @@ export default function DashboardPage() {
 
             {/* --- MODALS RENDERED AT TOP LEVEL --- */}
             <EditBalanceModal isOpen={!!editingBalance} onClose={() => setEditingBalance(null)} onUpdateBalance={handleUpdateBalance} title={modalInfo.title} currentBalance={modalInfo.currentBalance} />
-
-            <AddIncomeModal isOpen={isIncomeModalOpen} onClose={() => setIsIncomeModalOpen(false)} />
-            <AddExpenseModal isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} />
         </>
     );
 }
