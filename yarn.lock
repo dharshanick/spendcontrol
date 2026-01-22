@@ -54,10 +54,10 @@
   dependencies:
     tslib "^2.1.0"
 
-"@capacitor/filesystem@^8.0.0":
-  version "8.0.0"
-  resolved "https://registry.npmjs.org/@capacitor/filesystem/-/filesystem-8.0.0.tgz"
-  integrity sha512-RRGNLW9xEqvVVHGyGlfS4Oy0R3Na+bEefwZElKbex22S9eZr5cg8wc750BPPVwbcv5lf5fJymkY8x8y6UwKPyg==
+"@capacitor/filesystem@^8.1.0":
+  version "8.1.0"
+  resolved "https://registry.npmjs.org/@capacitor/filesystem/-/filesystem-8.1.0.tgz"
+  integrity sha512-AfawIxQ8xBmKsEn/vEpgurGQB9+hFXRtwEiCXR+SSS0MkTw4bJrvLGnloZ/PblegYefvnay1q079Yz3PQ6y1dA==
   dependencies:
     "@capacitor/synapse" "^1.0.4"
 

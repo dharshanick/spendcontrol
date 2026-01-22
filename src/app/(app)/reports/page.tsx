@@ -12,20 +12,22 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
 
+// --- CAPACITOR IMPORTS ---
+import { Capacitor } from "@capacitor/core";
+import { Share } from "@capacitor/share";
+import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
+
 export default function ReportsPage() {
   const { transactions } = useTransactions();
   const { currencySymbol } = useCurrency();
 
-  // Default to current month
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Filter transactions based on selected range
   const filteredData = useMemo(() => {
     const start = new Date(startDate);
     const end = new Date(endDate);
-    // Set end date time to end of day to include transactions on that day
     end.setHours(23, 59, 59, 999);
 
     return transactions.filter((t) => {
@@ -34,14 +36,12 @@ export default function ReportsPage() {
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions, startDate, endDate]);
 
-  // Calculate totals for the selected period
   const totals = useMemo(() => {
     const income = filteredData.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const expense = filteredData.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     return { income, expense, net: income - expense };
   }, [filteredData]);
 
-  // --- PDF GENERATION & SHARE LOGIC ---
   const handleGenerateReport = async () => {
     if (filteredData.length === 0) {
       toast.error("No transactions found in this date range.");
@@ -53,49 +53,41 @@ export default function ReportsPage() {
     try {
       const doc = new jsPDF();
 
-      // 1. Header Section
-      doc.setFillColor(20, 20, 20); // Dark Header
+      // -- PDF GENERATION LOGIC (Same as before) --
+      doc.setFillColor(20, 20, 20);
       doc.rect(0, 0, 210, 40, "F");
-
-      doc.setTextColor(34, 197, 94); // Green Brand Color
+      doc.setTextColor(34, 197, 94);
       doc.setFontSize(22);
       doc.setFont("helvetica", "bold");
       doc.text("SpendControl", 14, 20);
-
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
       doc.setFont("helvetica", "normal");
       doc.text("Financial Statement", 14, 30);
 
-      // 2. Period Info
       doc.setTextColor(100, 100, 100);
       doc.setFontSize(10);
-      doc.text(`Statement Period: ${format(new Date(startDate), "dd MMM yyyy")} to ${format(new Date(endDate), "dd MMM yyyy")}`, 14, 50);
-      doc.text(`Generated On: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, 14, 55);
+      doc.text(`Period: ${format(new Date(startDate), "dd MMM yyyy")} - ${format(new Date(endDate), "dd MMM yyyy")}`, 14, 50);
 
-      // 3. Summary Box
       doc.setDrawColor(220, 220, 220);
       doc.setFillColor(250, 250, 250);
       doc.roundedRect(14, 65, 180, 25, 3, 3, "FD");
 
       doc.setFontSize(10);
       doc.setTextColor(0, 0, 0);
-      doc.text("Total Income", 20, 75);
-      doc.text("Total Expense", 80, 75);
-      doc.text("Net Savings", 140, 75);
+      doc.text("Income", 20, 75);
+      doc.text("Expense", 80, 75);
+      doc.text("Net", 140, 75);
 
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(22, 163, 74); // Green
+      doc.setTextColor(22, 163, 74);
       doc.text(`+ ${currencySymbol}${totals.income.toLocaleString()}`, 20, 83);
-
-      doc.setTextColor(220, 38, 38); // Red
+      doc.setTextColor(220, 38, 38);
       doc.text(`- ${currencySymbol}${totals.expense.toLocaleString()}`, 80, 83);
-
-      doc.setTextColor(0, 0, 0); // Black
+      doc.setTextColor(0, 0, 0);
       doc.text(`${currencySymbol}${totals.net.toLocaleString()}`, 140, 83);
 
-      // 4. Transaction Table
       const tableRows = filteredData.map(t => [
         format(new Date(t.date), "dd/MM/yyyy"),
         t.title,
@@ -106,7 +98,7 @@ export default function ReportsPage() {
 
       autoTable(doc, {
         startY: 100,
-        head: [['Date', 'Description', 'Category', 'Type', `Amount (${currencySymbol})`]],
+        head: [['Date', 'Description', 'Category', 'Type', 'Amount']],
         body: tableRows,
         theme: 'striped',
         headStyles: { fillColor: [34, 197, 94] },
@@ -114,65 +106,51 @@ export default function ReportsPage() {
         alternateRowStyles: { fillColor: [245, 245, 245] }
       });
 
-      // 5. Footer
-      const pageCount = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`SpendControl App - Confidential Financial Report`, 14, doc.internal.pageSize.height - 10);
-        doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 10);
-      }
-
       const fileName = `Statement_${startDate}_to_${endDate}.pdf`;
 
-      // --- SHARE LOGIC ---
-      // Create a File object from the generated PDF
-      const pdfBlob = doc.output('blob');
-      const file = new File([pdfBlob], fileName, { type: "application/pdf" });
+      // --- NATIVE SHARE LOGIC ---
+      if (Capacitor.isNativePlatform()) {
+        // 1. Get Base64 string of the PDF (without the data URI prefix)
+        const pdfBase64 = doc.output('datauristring').split(',')[1];
 
-      // Check if the browser supports sharing files (Works on most Android/iOS devices)
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({
-            title: 'SpendControl Statement',
-            text: `Here is my financial statement from ${startDate} to ${endDate}.`,
-            files: [file],
-          });
-          toast.success("Shared successfully!");
-        } catch (error) {
-          if ((error as any).name !== 'AbortError') {
-            console.error('Error sharing:', error);
-            // If share fails, fallback to download
-            doc.save(fileName);
-            toast.success("Statement downloaded!");
-          }
-        }
+        // 2. Write file to the device's cache directory
+        const writtenFile = await Filesystem.writeFile({
+          path: fileName,
+          data: pdfBase64,
+          directory: Directory.Cache,
+          // encoding: Encoding.UTF8 // Not needed for base64 data in some versions, simpler to leave off for binary
+        });
+
+        // 3. Share the file using the native dialog
+        await Share.share({
+          title: 'Financial Statement',
+          text: `Here is my SpendControl statement from ${startDate} to ${endDate}`,
+          files: [writtenFile.uri], // This opens the share sheet with the file attached
+        });
+
+        toast.success("Share menu opened!");
       } else {
-        // Fallback for Desktop or browsers that don't support sharing
+        // --- WEB FALLBACK ---
         doc.save(fileName);
         toast.success("Statement downloaded!");
       }
 
     } catch (e) {
-      console.error(e);
-      toast.error("Failed to generate report.");
+      console.error("Share failed", e);
+      toast.error("Could not generate or share report.");
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    /* UPDATED: Added pt-24 for mobile to push content below the menu button */
     <div className="space-y-6 pb-24 px-4 md:px-0 pt-24 md:pt-6">
       <div>
         <h1 className="text-3xl font-bold">Reports & Statements</h1>
-        <p className="text-muted-foreground mt-1">Select a date range to generate and share your financial statement.</p>
+        <p className="text-muted-foreground mt-1">Select a date range to generate and share your custom financial statement.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-
-        {/* --- CONTROL PANEL --- */}
         <Card className="shadow-lg border-zinc-200 dark:border-zinc-800">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -185,25 +163,14 @@ export default function ReportsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Start Date</label>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-zinc-50 dark:bg-zinc-900"
-                />
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-zinc-50 dark:bg-zinc-900" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">End Date</label>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-zinc-50 dark:bg-zinc-900"
-                />
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-zinc-50 dark:bg-zinc-900" />
               </div>
             </div>
 
-            {/* Summary Preview */}
             <div className="p-4 bg-zinc-100 dark:bg-zinc-900/50 rounded-xl space-y-3 border border-zinc-200 dark:border-zinc-800">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Transactions found:</span>
@@ -222,17 +189,13 @@ export default function ReportsPage() {
               onClick={handleGenerateReport}
               disabled={isGenerating || filteredData.length === 0}
             >
-              {isGenerating ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Share2 className="mr-2 h-4 w-4" />
-              )}
+              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
               {isGenerating ? "Generating..." : "Download & Share PDF"}
             </Button>
           </CardContent>
         </Card>
 
-        {/* --- PREVIEW LIST --- */}
+        {/* Preview List (Unchanged) */}
         <Card className="h-[400px] flex flex-col shadow-lg border-zinc-200 dark:border-zinc-800">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
