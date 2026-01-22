@@ -16,6 +16,10 @@ import ReminderModal from "@/components/reminders/reminder-modal";
 import type { Budget, Transaction } from "@/lib/types";
 import QuickActions from "@/components/dashboard/quick-actions";
 
+// --- NEW IMPORTS FOR MODALS ---
+import AddIncomeModal from "@/components/shared/add-income-modal";
+import AddExpenseModal from "@/components/shared/add-expense-modal";
+
 const calculatePercentageChange = (current: number, previous: number) => {
     if (previous === 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous) * 100;
@@ -23,16 +27,18 @@ const calculatePercentageChange = (current: number, previous: number) => {
 
 export default function DashboardPage() {
     const { transactions, addTransaction } = useTransactions();
-    // FIX: Destructure removeBudget
     const { budgets, updateBudget, removeBudget } = useBudgets();
 
+    // --- STATE FOR MODALS ---
     const [editingBalance, setEditingBalance] = useState<"total" | "monthly" | "income" | null>(null);
+    const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
+    const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+
     const [currentDate, setCurrentDate] = useState(new Date());
 
     useEffect(() => { setCurrentDate(new Date()); }, []);
 
-    // ... [Logic for dates/summaries - NO CHANGES NEEDED HERE] ...
-
+    // ... [Date & Summary Logic - Unchanged] ...
     const { referenceDate, hasTransactions } = useMemo(() => {
         if (transactions.length > 0) return { referenceDate: currentDate, hasTransactions: true };
         return { referenceDate: currentDate, hasTransactions: false };
@@ -45,23 +51,11 @@ export default function DashboardPage() {
         return { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
     }, [referenceDate]);
 
-    // Helpers
-    const isWeeklyBudget = (b: Budget) => {
-        const d = differenceInDays(new Date(b.endDate), new Date(b.startDate));
-        return d >= 6 && d <= 8;
-    };
-    const isMonthlyBudget = (b: Budget) => {
-        const s = startOfDay(new Date(b.startDate));
-        const e = endOfDay(new Date(b.endDate));
-        return isEqual(s, startOfMonth(s)) && isEqual(e, endOfMonth(s));
-    };
-    const isYearlyBudget = (b: Budget) => {
-        const d = differenceInDays(new Date(b.endDate), new Date(b.startDate));
-        return d > 300;
-    };
+    // Helpers & Selection Logic
+    const isWeeklyBudget = (b: Budget) => { const d = differenceInDays(new Date(b.endDate), new Date(b.startDate)); return d >= 6 && d <= 8; };
+    const isMonthlyBudget = (b: Budget) => { const s = startOfDay(new Date(b.startDate)); const e = endOfDay(new Date(b.endDate)); return isEqual(s, startOfMonth(s)) && isEqual(e, endOfMonth(s)); };
+    const isYearlyBudget = (b: Budget) => { const d = differenceInDays(new Date(b.endDate), new Date(b.startDate)); return d > 300; };
 
-    // --- SELECTION LOGIC ---
-    // We try to find a budget that matches the current date first.
     const currentWeeklyBudget = useMemo(() => budgets.find(b => isWeeklyBudget(b) && isWithinInterval(currentDate, { start: startOfDay(new Date(b.startDate)), end: endOfDay(new Date(b.endDate)) })), [budgets, currentDate]);
     const currentMonthlyBudget = useMemo(() => budgets.find(b => isMonthlyBudget(b) && isWithinInterval(currentDate, { start: startOfDay(new Date(b.startDate)), end: endOfDay(new Date(b.endDate)) })), [budgets, currentDate]);
     const currentYearlyBudget = useMemo(() => budgets.find(b => isYearlyBudget(b) && isWithinInterval(currentDate, { start: startOfDay(new Date(b.startDate)), end: endOfDay(new Date(b.endDate)) })), [budgets, currentDate]);
@@ -70,44 +64,23 @@ export default function DashboardPage() {
     const [selectedMonthlyBudget, setSelectedMonthlyBudget] = useState<Budget | undefined>(undefined);
     const [selectedYearlyBudget, setSelectedYearlyBudget] = useState<Budget | undefined>(undefined);
 
-    // Sync state with found budgets
     useEffect(() => { setSelectedWeeklyBudget(currentWeeklyBudget); }, [currentWeeklyBudget]);
     useEffect(() => { setSelectedMonthlyBudget(currentMonthlyBudget); }, [currentMonthlyBudget]);
     useEffect(() => { setSelectedYearlyBudget(currentYearlyBudget); }, [currentYearlyBudget]);
-
 
     const selectableWeeklyBudgets = useMemo(() => budgets.filter(isWeeklyBudget), [budgets]);
     const selectableMonthlyBudgets = useMemo(() => budgets.filter(b => isMonthlyBudget(b) && getYear(new Date(b.startDate)) === getYear(currentDate)), [budgets, currentDate]);
     const selectableYearlyBudgets = useMemo(() => budgets.filter(isYearlyBudget), [budgets]);
 
-    const handleUpdateBudget = (newGoal: number, budgetToUpdate: Budget | undefined) => {
-        if (!budgetToUpdate) return;
-        updateBudget({ ...budgetToUpdate, goal: newGoal });
-    };
+    const handleUpdateBudget = (newGoal: number, budgetToUpdate: Budget | undefined) => { if (!budgetToUpdate) return; updateBudget({ ...budgetToUpdate, goal: newGoal }); };
+    const handleDeleteBudget = (budget: Budget | undefined) => { if (!budget || !budget.id) return; removeBudget(budget.id); if (selectedWeeklyBudget?.id === budget.id) setSelectedWeeklyBudget(undefined); if (selectedMonthlyBudget?.id === budget.id) setSelectedMonthlyBudget(undefined); if (selectedYearlyBudget?.id === budget.id) setSelectedYearlyBudget(undefined); };
 
-    // --- FIX: ROBUST DELETE HANDLER ---
-    const handleDeleteBudget = (budget: Budget | undefined) => {
-        if (!budget || !budget.id) return;
-        removeBudget(budget.id);
-
-        // Clear local selection if we just deleted the selected one
-        if (selectedWeeklyBudget?.id === budget.id) setSelectedWeeklyBudget(undefined);
-        if (selectedMonthlyBudget?.id === budget.id) setSelectedMonthlyBudget(undefined);
-        if (selectedYearlyBudget?.id === budget.id) setSelectedYearlyBudget(undefined);
-    };
-
-    // Summaries
     const monthlySummary = useMemo(() => {
         const thisMonthIncome = transactions.filter(t => t.type === 'income' && isWithinInterval(parseISO(t.date), thisMonthInterval)).reduce((acc, t) => acc + t.amount, 0);
         const thisMonthExpenses = transactions.filter(t => t.type === 'expense' && isWithinInterval(parseISO(t.date), thisMonthInterval)).reduce((acc, t) => acc + t.amount, 0);
         const lastMonthIncome = transactions.filter(t => t.type === 'income' && isWithinInterval(parseISO(t.date), lastMonthInterval)).reduce((acc, t) => acc + t.amount, 0);
         const lastMonthExpenses = transactions.filter(t => t.type === 'expense' && isWithinInterval(parseISO(t.date), lastMonthInterval)).reduce((acc, t) => acc + t.amount, 0);
-        return {
-            thisMonthIncome,
-            thisMonthBalance: thisMonthIncome - thisMonthExpenses,
-            incomeComparison: calculatePercentageChange(thisMonthIncome, lastMonthIncome),
-            balanceComparison: calculatePercentageChange(thisMonthIncome - thisMonthExpenses, lastMonthIncome - lastMonthExpenses)
-        };
+        return { thisMonthIncome, thisMonthBalance: thisMonthIncome - thisMonthExpenses, incomeComparison: calculatePercentageChange(thisMonthIncome, lastMonthIncome), balanceComparison: calculatePercentageChange(thisMonthIncome - thisMonthExpenses, lastMonthIncome - lastMonthExpenses) };
     }, [transactions, thisMonthInterval, lastMonthInterval]);
 
     const savingsSummary = useMemo(() => {
@@ -117,9 +90,7 @@ export default function DashboardPage() {
     }, [transactions, lastMonthInterval]);
 
     const handleUpdateBalance = (newBalance: number) => {
-        let adjustment: number;
-        let title: string;
-        let date: string;
+        let adjustment: number; let title: string; let date: string;
         if (editingBalance === 'total') { adjustment = newBalance - savingsSummary.totalSavings; title = "Balance Adjustment (Total)"; date = new Date().toISOString(); }
         else if (editingBalance === 'monthly') { adjustment = newBalance - monthlySummary.thisMonthBalance; title = "Balance Adjustment (Monthly)"; date = referenceDate.toISOString(); }
         else if (editingBalance === 'income') { adjustment = newBalance - monthlySummary.thisMonthIncome; title = "Income Adjustment"; date = referenceDate.toISOString(); }
@@ -136,11 +107,6 @@ export default function DashboardPage() {
             default: return { title: '', currentBalance: 0 };
         }
     };
-
-    const weeklyInterval = useMemo(() => {
-        if (selectedWeeklyBudget) return { start: new Date(selectedWeeklyBudget.startDate), end: new Date(selectedWeeklyBudget.endDate) };
-        return { start: startOfWeek(currentDate, { weekStartsOn: 1 }), end: endOfWeek(currentDate, { weekStartsOn: 1 }) };
-    }, [selectedWeeklyBudget, currentDate]);
 
     const calculateSpent = (budget: Budget, transactions: Transaction[]) => {
         const s = startOfDay(new Date(budget.startDate));
@@ -159,7 +125,7 @@ export default function DashboardPage() {
             <ReminderModal />
             <div className="space-y-6 pb-24 md:pb-0 md:pt-4">
 
-                {/* --- FIXED MOBILE HEADER (HIDDEN ON DESKTOP) --- */}
+                {/* --- FIXED MOBILE HEADER --- */}
                 <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-3 pt-12 pb-4 bg-background/80 backdrop-blur-md border-b border-white/5 md:hidden">
                     <div className="h-10 w-10 bg-green-500/20 rounded-xl flex items-center justify-center">
                         <Wallet className="h-6 w-6 text-green-500" />
@@ -169,10 +135,14 @@ export default function DashboardPage() {
                     </h1>
                 </div>
 
-                {/* Spacer for mobile only */}
-                <div className="pt-24 md:hidden"></div>
+                {/* --- REDUCED SPACER (pt-20 instead of pt-24) to close gap --- */}
+                <div className="pt-20 md:hidden"></div>
 
-                <QuickActions />
+                {/* Quick Actions with Props passed down */}
+                <QuickActions
+                    onAddIncome={() => setIsIncomeModalOpen(true)}
+                    onAddExpense={() => setIsExpenseModalOpen(true)}
+                />
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-3">
                     <SummaryCard title={hasTransactions ? `${monthName}'s Income` : "Income"} amount={monthlySummary.thisMonthIncome} comparison={monthlySummary.incomeComparison} icon={<IndianRupee className="h-5 w-5 text-muted-foreground" />} onEdit={() => setEditingBalance('income')} />
@@ -185,7 +155,6 @@ export default function DashboardPage() {
                         selectableBudgets={selectableWeeklyBudgets}
                         onSelectBudget={setSelectedWeeklyBudget}
                         onUpdateBudget={(newGoal) => handleUpdateBudget(newGoal, budgetForWeeklyCard)}
-                        // FIX: Calling the robust delete handler
                         onDelete={() => handleDeleteBudget(budgetForWeeklyCard)}
                     />
                     <DashboardBudgetCard
@@ -208,14 +177,9 @@ export default function DashboardPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="md:col-span-2">
-                        {/* Passing referenceDate ensures the chart uses the dashboard's time.
-                            Note: The chart now handles the "Weekly/Monthly/Yearly" logic internally 
-                            but respects this date as "Today".
-                        */}
                         <SpendingOverviewChart referenceDate={currentDate} />
                     </div>
                     <div className="md:col-span-1">
-                        {/* Passing currentDate ensures the flow chart resets correctly */}
                         <SpendingFlowChart currentDate={currentDate} />
                     </div>
                 </div>
@@ -224,7 +188,12 @@ export default function DashboardPage() {
                     <AIInsights />
                 </div>
             </div>
+
+            {/* --- MODALS RENDERED AT TOP LEVEL --- */}
             <EditBalanceModal isOpen={!!editingBalance} onClose={() => setEditingBalance(null)} onUpdateBalance={handleUpdateBalance} title={modalInfo.title} currentBalance={modalInfo.currentBalance} />
+
+            <AddIncomeModal isOpen={isIncomeModalOpen} onClose={() => setIsIncomeModalOpen(false)} />
+            <AddExpenseModal isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} />
         </>
     );
 }
