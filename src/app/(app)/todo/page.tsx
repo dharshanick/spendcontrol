@@ -17,6 +17,7 @@ interface Todo {
 export default function TodoPage() {
     const [todos, setTodos] = useState<Todo[]>([]);
     const [newTodo, setNewTodo] = useState("");
+    const [isLoaded, setIsLoaded] = useState(false);
 
     // Load from local storage on mount
     useEffect(() => {
@@ -26,12 +27,17 @@ export default function TodoPage() {
                 setTodos(JSON.parse(saved));
             } catch (e) { console.error(e); }
         }
+        // FIX: Mark data as loaded so we don't overwrite local storage with empty initial state
+        setIsLoaded(true);
     }, []);
 
     // Save to local storage whenever todos change
     useEffect(() => {
+        // FIX: Check if data has been loaded first.
+        // If we don't check this, the initial empty 'todos' array would overwrite your saved data!
+        if (!isLoaded) return;
         localStorage.setItem("todo-storage", JSON.stringify(todos));
-    }, [todos]);
+    }, [todos, isLoaded]);
 
     const handleAdd = () => {
         if (!newTodo.trim()) return;
@@ -58,38 +64,39 @@ export default function TodoPage() {
     };
 
     return (
-        <div className="space-y-6 pt-24 pb-24 px-4 min-h-screen">
-            <div>
-                <h2 className="text-3xl font-bold tracking-tight">Financial Tasks</h2>
-                <p className="text-muted-foreground">Keep track of your bills, savings goals, and reminders.</p>
+        <div className="space-y-8 pt-24 pb-24 px-4 max-w-3xl mx-auto min-h-screen">
+            <div className="space-y-2">
+                <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Financial Tasks</h2>
+                <p className="text-lg text-muted-foreground">Keep track of your bills, savings goals, and reminders.</p>
             </div>
 
-            <Card className="border-zinc-800 bg-black/40 backdrop-blur-sm">
+            <Card className="border-border bg-card/50 backdrop-blur-sm shadow-xl shadow-primary/5 overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-20"></div>
                 <CardHeader>
                     <CardTitle>Add New Task</CardTitle>
                     <CardDescription>What do you need to remember?</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex gap-3">
+                    <div className="flex gap-4">
                         <Input
                             placeholder="e.g., Pay Credit Card Bill"
                             value={newTodo}
                             onChange={(e) => setNewTodo(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            className="bg-zinc-900 border-zinc-700"
+                            className="bg-background border-input text-lg h-12 shadow-inner focus-visible:ring-primary/20"
                         />
-                        <Button onClick={handleAdd} className="bg-green-600 hover:bg-green-700 text-white">
-                            <Plus className="h-4 w-4 mr-2" /> Add
+                        <Button onClick={handleAdd} size="lg" className="h-12 px-6 shadow-md shadow-primary/20 transition-transform active:scale-95">
+                            <Plus className="h-5 w-5 mr-2" /> Add
                         </Button>
                     </div>
                 </CardContent>
             </Card>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
                 {todos.length === 0 && (
-                    <div className="text-center py-12 text-muted-foreground">
-                        <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                        <p>No pending tasks. You're all caught up!</p>
+                    <div className="text-center py-16 text-muted-foreground border-2 border-dashed border-muted rounded-xl bg-muted/20">
+                        <CheckCircle2 className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                        <p className="text-lg">No pending tasks. You're all caught up!</p>
                     </div>
                 )}
 
@@ -97,26 +104,31 @@ export default function TodoPage() {
                     <div
                         key={todo.id}
                         className={cn(
-                            "flex items-center justify-between p-4 rounded-xl border transition-all duration-200 group",
+                            "flex items-center justify-between p-5 rounded-xl border transition-all duration-300 group relative overflow-hidden",
                             todo.completed
-                                ? "bg-zinc-900/30 border-zinc-800/50 opacity-60"
-                                : "bg-card border-border hover:border-zinc-700"
+                                ? "bg-muted/30 border-transparent opacity-60"
+                                : "bg-card border-border/50 hover:border-primary/30 shadow-sm hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5"
                         )}
                     >
+                        {/* Status Indicator Bar */}
+                        {!todo.completed && (
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/0 group-hover:bg-primary transition-colors duration-300" />
+                        )}
+
                         <div className="flex items-center gap-4 flex-1">
-                            <button onClick={() => toggleTodo(todo.id)} className="text-zinc-500 hover:text-green-500 transition-colors">
+                            <button onClick={() => toggleTodo(todo.id)} className={cn("transition-colors duration-300", todo.completed ? "text-primary/50" : "text-muted-foreground hover:text-primary")}>
                                 {todo.completed ? (
-                                    <CheckCircle2 className="h-6 w-6 text-green-500" />
+                                    <CheckCircle2 className="h-6 w-6" />
                                 ) : (
                                     <Circle className="h-6 w-6" />
                                 )}
                             </button>
 
-                            <div className="flex flex-col">
-                                <span className={cn("font-medium transition-all", todo.completed && "line-through text-muted-foreground")}>
+                            <div className="flex flex-col gap-0.5">
+                                <span className={cn("font-medium text-base transition-all duration-300", todo.completed && "line-through text-muted-foreground")}>
                                     {todo.text}
                                 </span>
-                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <span className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
                                     <CalendarDays className="h-3 w-3" /> {todo.date}
                                 </span>
                             </div>
@@ -126,7 +138,7 @@ export default function TodoPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => deleteTodo(todo.id)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
+                            className="opacity-0 group-hover:opacity-100 transition-all duration-300 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                         >
                             <Trash2 className="h-4 w-4" />
                         </Button>
