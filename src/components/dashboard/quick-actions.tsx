@@ -18,7 +18,7 @@ export default function QuickActions() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative z-50">
       <h2 className="text-lg font-bold flex items-center gap-2">
         <div className="h-5 w-1 bg-yellow-500 rounded-full"></div>
         Quick Actions

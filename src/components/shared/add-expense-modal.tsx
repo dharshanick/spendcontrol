@@ -44,7 +44,12 @@ const formSchema = z.object({
 });
 
 
-export default function AddExpenseModal() {
+interface AddExpenseModalProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function AddExpenseModal({ isOpen, onClose }: AddExpenseModalProps) {
   const { toast } = useToast();
   const { currencySymbol } = useCurrency();
   const { 
@@ -71,8 +76,10 @@ export default function AddExpenseModal() {
     }
   });
 
+  const showModal = isOpen !== undefined ? isOpen : isAddExpenseModalOpen;
+
   useEffect(() => {
-    if (isAddExpenseModalOpen) {
+    if (showModal) {
       if (isEditing && editingTransaction) {
         const transactionDate = parseISO(editingTransaction.date);
         
@@ -98,7 +105,7 @@ export default function AddExpenseModal() {
         });
       }
     }
-  }, [isAddExpenseModalOpen, isEditing, editingTransaction, form]);
+  }, [showModal, isEditing, editingTransaction, form]);
 
   const quickAdd = (amount: number) => {
     const currentAmount = form.getValues("amount") || 0;
@@ -143,11 +150,15 @@ export default function AddExpenseModal() {
   const handleClose = () => {
     form.reset();
     setEditingTransaction(null);
-    setAddExpenseModalOpen(false);
+    if (onClose) {
+      onClose();
+    } else {
+      setAddExpenseModalOpen(false);
+    }
   }
 
   return (
-    <Dialog open={isAddExpenseModalOpen} onOpenChange={handleClose}>
+    <Dialog open={showModal} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md bg-card/80 backdrop-blur-sm flex flex-col">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Expense' : 'Add New Expense'}</DialogTitle>

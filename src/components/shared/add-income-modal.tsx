@@ -39,7 +39,12 @@ const formSchema = z.object({
   description: z.string().max(1500, "Description cannot exceed 300 words.").optional(),
 });
 
-export default function AddIncomeModal() {
+interface AddIncomeModalProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {
   const { toast } = useToast();
   const { currencySymbol } = useCurrency();
   const { 
@@ -58,8 +63,11 @@ export default function AddIncomeModal() {
     },
   });
 
+  // Determine visibility: props take precedence over global state
+  const showModal = isOpen !== undefined ? isOpen : isAddIncomeModalOpen;
+
   useEffect(() => {
-    if(isAddIncomeModalOpen) {
+    if(showModal) {
         form.reset({
             amount: 0,
             title: "Monthly Salary",
@@ -67,7 +75,7 @@ export default function AddIncomeModal() {
             description: "",
         });
     }
-  }, [isAddIncomeModalOpen, form]);
+  }, [showModal, form]);
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     const transactionDate = parse(values.date, "yyyy-MM-dd", new Date());
@@ -93,11 +101,15 @@ export default function AddIncomeModal() {
   }
 
   const handleClose = () => {
-    setAddIncomeModalOpen(false);
+    if (onClose) {
+      onClose();
+    } else {
+      setAddIncomeModalOpen(false);
+    }
   }
 
   return (
-    <Dialog open={isAddIncomeModalOpen} onOpenChange={handleClose}>
+    <Dialog open={showModal} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md bg-card/80 backdrop-blur-sm">
         <DialogHeader>
           <DialogTitle>Add Income</DialogTitle>
