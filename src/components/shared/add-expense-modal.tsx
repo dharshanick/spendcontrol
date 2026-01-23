@@ -44,17 +44,26 @@ const formSchema = z.object({
 });
 
 
-export default function AddExpenseModal() {
+interface AddExpenseModalProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function AddExpenseModal({ isOpen, onClose }: AddExpenseModalProps) {
   const { toast } = useToast();
   const { currencySymbol } = useCurrency();
   const { 
     addTransaction, 
-    isAddExpenseModalOpen, 
-    setAddExpenseModalOpen,
+    isAddExpenseModalOpen: contextIsOpen,
+    setAddExpenseModalOpen: contextSetIsOpen,
     editingTransaction,
     setEditingTransaction,
     updateTransaction,
   } = useTransactions();
+
+  const isControlled = typeof isOpen === 'boolean';
+  const effectiveIsOpen = isControlled ? isOpen : contextIsOpen;
+  const effectiveOnClose = isControlled && onClose ? onClose : () => contextSetIsOpen(false);
 
   const isEditing = !!editingTransaction;
   
@@ -72,7 +81,7 @@ export default function AddExpenseModal() {
   });
 
   useEffect(() => {
-    if (isAddExpenseModalOpen) {
+    if (effectiveIsOpen) {
       if (isEditing && editingTransaction) {
         const transactionDate = parseISO(editingTransaction.date);
         
@@ -98,7 +107,7 @@ export default function AddExpenseModal() {
         });
       }
     }
-  }, [isAddExpenseModalOpen, isEditing, editingTransaction, form]);
+  }, [effectiveIsOpen, isEditing, editingTransaction, form]);
 
   const quickAdd = (amount: number) => {
     const currentAmount = form.getValues("amount") || 0;
@@ -143,11 +152,11 @@ export default function AddExpenseModal() {
   const handleClose = () => {
     form.reset();
     setEditingTransaction(null);
-    setAddExpenseModalOpen(false);
+    effectiveOnClose();
   }
 
   return (
-    <Dialog open={isAddExpenseModalOpen} onOpenChange={handleClose}>
+    <Dialog open={effectiveIsOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md bg-card/80 backdrop-blur-sm flex flex-col">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Expense' : 'Add New Expense'}</DialogTitle>

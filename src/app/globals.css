@@ -109,6 +109,8 @@ body {
   overflow-x: hidden; /* Prevent side scrolling */
   overscroll-behavior-y: none; /* Disables "pull-to-refresh" rubber banding */
   -webkit-tap-highlight-color: transparent; /* Removes blue tap box on mobile */
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* Ensure the main app container fills the screen exactly */
