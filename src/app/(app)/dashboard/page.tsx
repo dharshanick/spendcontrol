@@ -117,7 +117,7 @@ export default function DashboardPage() {
     return (
         <>
             <ReminderModal />
-            <div className="pt-16 pb-24 md:pb-0 md:pt-4">
+            <div className="pt-16 px-4 pb-24 md:pb-0 md:pt-4">
 
                 {/* --- FIXED MOBILE HEADER --- */}
                 <div className="fixed top-0 left-0 right-0 z-40 h-16 flex items-center justify-center gap-3 bg-background/80 backdrop-blur-md border-b border-white/5 md:hidden">
