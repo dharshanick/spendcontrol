@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import "./globals.css";
+import "./globals.css";  // <--- This file MUST have this import
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
@@ -41,7 +41,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="min-h-screen bg-background pt-[env(safe-area-inset-top)]">
+          {/* -------------------------------------------------------
+             CRITICAL FIX IS HERE:
+             1. We removed 'pt-[env(safe-area-inset-top)]'
+             2. We added 'h-full' to ensure no scrolling glitches
+             -------------------------------------------------------
+          */}
+          <div className="min-h-screen bg-background h-full">
             <AppLock>{children}</AppLock>
           </div>
           <Toaster />

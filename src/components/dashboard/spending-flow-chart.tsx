@@ -1,134 +1,136 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCurrency } from "@/hooks/use-currency";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useTransactions } from "@/hooks/use-transactions";
+import { startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
+import { RefreshCcw, MoreHorizontal, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
-  startOfWeek, endOfWeek, startOfMonth, endOfMonth,
-  startOfYear, endOfYear, isWithinInterval, parseISO
-} from "date-fns";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-const COLORS = [
-  "#22c55e", "#3b82f6", "#eab308", "#f97316",
-  "#a855f7", "#ec4899", "#06b6d4", "#ef4444",
-];
+interface SpendingFlowProps {
+  currentDate: Date;
+}
 
-export default function SpendingFlowChart({ currentDate }: { currentDate: Date }) {
-  const { currencySymbol } = useCurrency();
+const COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#8b5cf6", "#d946ef"];
+
+export default function SpendingFlowChart({ currentDate }: SpendingFlowProps) {
   const { transactions } = useTransactions();
-  const [timeRange, setTimeRange] = useState("Monthly");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [isDeleted, setIsDeleted] = useState(false); // State to control visibility
 
-  const chartData = useMemo(() => {
-    const today = currentDate || new Date();
-    let start, end;
+  const categoryData = useMemo(() => {
+    if (isDeleted) return [];
 
-    // ALGORITHM: Determine Date Range strictly based on 'today'
-    if (timeRange === "Weekly") {
-      start = startOfWeek(today, { weekStartsOn: 1 });
-      end = endOfWeek(today, { weekStartsOn: 1 });
-    } else if (timeRange === "Monthly") {
-      start = startOfMonth(today);
-      end = endOfMonth(today);
-    } else {
-      // Yearly
-      start = startOfYear(today);
-      end = endOfYear(today);
-    }
+    const start = startOfMonth(currentDate);
+    const end = endOfMonth(currentDate);
 
-    // Filter Expenses only within the calculated window
-    const relevantTransactions = transactions.filter(
-      (t) => t.type === "expense" && isWithinInterval(parseISO(t.date), { start, end })
+    const monthlyExpenses = transactions.filter(t =>
+      t.type === 'expense' &&
+      isWithinInterval(parseISO(t.date), { start, end })
     );
 
-    // Group by Category
-    const categoryMap: Record<string, number> = {};
-    relevantTransactions.forEach((t) => {
-      const cat = t.category || "Uncategorized";
-      categoryMap[cat] = (categoryMap[cat] || 0) + t.amount;
-    });
+    const grouped = monthlyExpenses.reduce((acc, curr) => {
+      const cat = curr.category || "Uncategorized";
+      acc[cat] = (acc[cat] || 0) + curr.amount;
+      return acc;
+    }, {} as Record<string, number>);
 
-    const data: { name: string; value: number; isEmpty?: boolean }[] = Object.entries(categoryMap).map(([name, value]) => ({
-      name,
-      value,
+    const data = Object.keys(grouped).map((cat) => ({
+      name: cat,
+      value: grouped[cat]
     }));
 
-    if (data.length === 0) {
-      return [{ name: "No spending data", value: 1, isEmpty: true }];
-    }
+    return data.sort((a, b) => b.value - a.value);
 
-    return data;
-  }, [transactions, timeRange, currentDate]);
+  }, [transactions, currentDate, refreshKey, isDeleted]);
+
+  const handleRefresh = () => {
+    setIsDeleted(false);
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  const handleDelete = () => {
+    setIsDeleted(true);
+  };
 
   return (
-    <Card className="col-span-4 shadow-md shadow-primary/10 h-full">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle>Spending Categories</CardTitle>
-          <Select defaultValue="Monthly" onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[100px] h-8 text-xs">
-              <SelectValue placeholder="Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Weekly">Weekly</SelectItem>
-              <SelectItem value="Monthly">Monthly</SelectItem>
-              <SelectItem value="Yearly">Yearly</SelectItem>
-            </SelectContent>
-          </Select>
+    <Card className="col-span-1 shadow-sm border-zinc-200 dark:border-zinc-800 h-full">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-base font-bold">Spending Categories</CardTitle>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+            onClick={handleRefresh}
+          >
+            <RefreshCcw className="h-4 w-4" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleDelete} className="text-red-500 focus:text-red-500 cursor-pointer">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete View
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Your expense distribution by category.
-        </p>
       </CardHeader>
-      <CardContent className="flex-1 pb-0">
-        <div className="h-[250px] w-full relative">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={chartData[0].isEmpty ? 0 : 5}
-                dataKey="value"
-                stroke="none"
-              >
-                {chartData.map((entry: any, index: number) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={entry.isEmpty ? "#333" : COLORS[index % COLORS.length]}
-                    className={entry.isEmpty ? "opacity-20" : ""}
-                  />
-                ))}
-              </Pie>
-
-              {!chartData[0].isEmpty && (
+      <CardContent>
+        {categoryData.length > 0 && !isDeleted ? (
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart key={refreshKey}>
+                <Pie
+                  data={categoryData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                  stroke="none"
+                  animationBegin={0}
+                  animationDuration={1500}
+                  animationEasing="ease-out"
+                >
+                  {categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
                 <Tooltip
-                  formatter={(value: number) => `${currencySymbol}${value}`}
-                  contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                  itemStyle={{ color: 'hsl(var(--foreground))' }}
+                  formatter={(value: number) => `₹${value.toLocaleString()}`}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                 />
-              )}
+              </PieChart>
+            </ResponsiveContainer>
 
-              <Legend
-                verticalAlign="bottom"
-                height={36}
-                iconType="circle"
-                formatter={(value) => (
-                  <span className="text-xs text-muted-foreground ml-1">{value}</span>
-                )}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          {chartData[0].isEmpty && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span className="text-xs text-muted-foreground">No spending data</span>
+            <div className="mt-2 flex flex-wrap justify-center gap-2">
+              {categoryData.slice(0, 3).map((item, index) => (
+                <div key={item.name} className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                  <span>{item.name}</span>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="h-[250px] flex flex-col items-center justify-center text-muted-foreground">
+            <p className="text-sm">No data to display</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

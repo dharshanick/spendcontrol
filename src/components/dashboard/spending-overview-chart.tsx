@@ -1,173 +1,125 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCurrency } from "@/hooks/use-currency";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { useTransactions } from "@/hooks/use-transactions";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from "date-fns";
+import { RefreshCcw, MoreHorizontal, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
-    startOfWeek, endOfWeek, eachDayOfInterval, format, isSameDay,
-    startOfMonth, endOfMonth, startOfYear, endOfYear, eachMonthOfInterval
-} from "date-fns";
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-export default function SpendingOverviewChart({ referenceDate }: { referenceDate?: Date }) {
-    const { currencySymbol } = useCurrency();
+interface SpendingOverviewProps {
+    referenceDate: Date;
+}
+
+export default function SpendingOverviewChart({ referenceDate }: SpendingOverviewProps) {
     const { transactions } = useTransactions();
-    const [timeRange, setTimeRange] = useState("Weekly");
-    const [isMounted, setIsMounted] = useState(false);
-
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
+    const [refreshKey, setRefreshKey] = useState(0);
+    const [isDeleted, setIsDeleted] = useState(false); // State to control visibility
 
     const chartData = useMemo(() => {
-        // ALGORITHM: Always anchor to the current reference date (Today)
-        const today = referenceDate || new Date();
-        let data = [];
+        // If 'isDeleted' is true, return empty data to clear lines/bars
+        if (isDeleted) return [];
 
-        if (timeRange === "Weekly") {
-            // 1. WEEKLY LOGIC: Monday to Sunday of the CURRENT week
-            // Automatically resets when the new week begins
-            const start = startOfWeek(today, { weekStartsOn: 1 });
-            const end = endOfWeek(today, { weekStartsOn: 1 });
-            const days = eachDayOfInterval({ start, end });
+        const start = startOfMonth(referenceDate);
+        const end = endOfMonth(referenceDate);
+        const daysInMonth = eachDayOfInterval({ start, end });
 
-            data = days.map(day => {
-                const amount = transactions
-                    .filter(t => t.type === 'expense' && isSameDay(new Date(t.date), day))
-                    .reduce((sum, t) => sum + t.amount, 0);
+        return daysInMonth.map((day) => {
+            const dayTransactions = transactions.filter((t) =>
+                isSameDay(parseISO(t.date), day)
+            );
 
-                return {
-                    day: format(day, "EEE"), // Mon, Tue...
-                    fullDate: format(day, "yyyy-MM-dd"),
-                    amount
-                };
-            });
-        } else if (timeRange === "Monthly") {
-            // 2. MONTHLY LOGIC: 1st to Last day of CURRENT Month
-            // Automatically resets on the 1st of next month
-            const start = startOfMonth(today);
-            const end = endOfMonth(today);
-            const days = eachDayOfInterval({ start, end });
+            const income = dayTransactions
+                .filter((t) => t.type === "income")
+                .reduce((sum, t) => sum + t.amount, 0);
 
-            data = days.map(day => {
-                const amount = transactions
-                    .filter(t => t.type === 'expense' && isSameDay(new Date(t.date), day))
-                    .reduce((sum, t) => sum + t.amount, 0);
-                return {
-                    day: format(day, "d"), // 1, 2, 3...
-                    amount
-                };
-            });
-        } else {
-            // 3. YEARLY LOGIC: Jan 1 to Dec 31 of CURRENT Year
-            const start = startOfYear(today);
-            const end = endOfYear(today);
-            const months = eachMonthOfInterval({ start, end });
+            const expense = dayTransactions
+                .filter((t) => t.type === "expense")
+                .reduce((sum, t) => sum + t.amount, 0);
 
-            data = months.map(month => {
-                const amount = transactions
-                    .filter(t =>
-                        t.type === 'expense' &&
-                        new Date(t.date).getMonth() === month.getMonth() &&
-                        new Date(t.date).getFullYear() === month.getFullYear()
-                    )
-                    .reduce((sum, t) => sum + t.amount, 0);
-                return {
-                    day: format(month, "MMM"), // Jan, Feb...
-                    amount
-                };
-            });
-        }
+            return {
+                day: format(day, "d"),
+                income,
+                expense,
+            };
+        });
+    }, [transactions, referenceDate, refreshKey, isDeleted]);
 
-        return data;
-    }, [transactions, timeRange, referenceDate]);
+    const handleRefresh = () => {
+        setIsDeleted(false); // Restore data
+        setRefreshKey((prev) => prev + 1); // Trigger animation replay
+    };
 
-    if (!isMounted) return <div className="col-span-4 h-[250px] w-full bg-muted/5 animate-pulse rounded-xl" />;
+    const handleDelete = () => {
+        setIsDeleted(true); // Clear data view
+    };
 
     return (
-        <Card className="col-span-4 shadow-md shadow-primary/10 h-full">
-            <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                    <CardTitle>Spending Overview</CardTitle>
-                    <div className="flex gap-2">
-                        <Select defaultValue="Weekly" onValueChange={setTimeRange}>
-                            <SelectTrigger className="w-[100px] h-8 text-xs">
-                                <SelectValue placeholder="Range" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Weekly">Weekly</SelectItem>
-                                <SelectItem value="Monthly">Monthly</SelectItem>
-                                <SelectItem value="Yearly">Yearly</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+        <Card className="col-span-2 shadow-sm border-zinc-200 dark:border-zinc-800">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base font-bold">Spending Overview</CardTitle>
+                <div className="flex items-center gap-1">
+                    {/* Refresh Button */}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        onClick={handleRefresh}
+                    >
+                        <RefreshCcw className="h-4 w-4" />
+                    </Button>
+
+                    {/* 3-Dot Menu */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={handleDelete} className="text-red-500 focus:text-red-500 cursor-pointer">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete View
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                    View your spending trends over time.
-                </p>
             </CardHeader>
-            <CardContent className="pl-0 pb-2">
-                <div className="h-[250px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted/20" vertical={false} />
-                            <XAxis
-                                dataKey="day"
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={10}
-                                interval={timeRange === "Monthly" ? 4 : 0}
-                                padding={{ left: 20, right: 20 }}
-                                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                            />
-                            <YAxis
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={(value) => `${currencySymbol}${value}`}
-                                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                                width={35}
-                            />
-                            <Tooltip
-                                content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                        return (
-                                            <div className="rounded-lg border bg-background p-2 shadow-sm">
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[0.65rem] uppercase text-muted-foreground">
-                                                            {payload[0].payload.day}
-                                                        </span>
-                                                        <span className="font-bold text-sm text-foreground">
-                                                            {currencySymbol}{payload[0].value}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-                                    return null;
-                                }}
-                            />
-                            <Area
-                                type="monotone"
-                                dataKey="amount"
-                                stroke="hsl(var(--primary))"
-                                strokeWidth={2}
-                                fillOpacity={1}
-                                fill="url(#colorAmount)"
-                                activeDot={{ r: 5, fill: "hsl(var(--primary))", strokeWidth: 0 }}
-                                dot={{ r: 3, fill: "hsl(var(--primary))", strokeWidth: 0 }}
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
+            <CardContent>
+                <div className="h-[250px] w-full mt-2">
+                    {!isDeleted && chartData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData} barGap={0} key={refreshKey}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E4E4E7" opacity={0.5} />
+                                <XAxis
+                                    dataKey="day"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tick={{ fontSize: 12, fill: "#71717a" }}
+                                    minTickGap={10}
+                                />
+                                <YAxis hide fontSize={12} />
+                                <Tooltip
+                                    cursor={{ fill: 'transparent' }}
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                />
+                                <Bar dataKey="income" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={40} animationDuration={1500} />
+                                <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} animationDuration={1500} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        // Empty State when deleted
+                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                            <p className="text-sm">No data to display</p>
+                        </div>
+                    )}
                 </div>
             </CardContent>
         </Card>
