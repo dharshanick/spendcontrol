@@ -4,46 +4,137 @@
 
 @layer base {
   :root {
+    /* --- LIGHT MODE (The "Clean Financial" Look) --- */
+
+    /* Background: Very soft grey, not harsh white */
     --background: 210 20% 98%;
+
+    /* Foreground: Deep, sharp black for text */
     --foreground: 222 47% 11%;
-    /* ... (keep your existing colors if you want, or use these defaults) ... */
+
+    /* Cards: Pure white to pop against the grey background */
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
+
+    /* Popovers: White */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary: Your Brand Green (adjusted slightly for light mode contrast) */
     --primary: 142 76% 36%;
     --primary-foreground: 355.7 100% 97.3%;
+
+    /* Secondary: Light grey for secondary buttons */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11.2%;
+
+    /* Muted: Subtle grey text */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    /* Accent: Hover states */
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11.2%;
+
+    /* Destructive: Red */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Borders: Very light grey to separate cards */
     --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 142 76% 36%;
+    /* Green Ring Focus */
+
     --radius: 0.75rem;
+    /* Rounded corners */
   }
 
   .dark {
+    /* --- DARK MODE (Your existing cool dark theme) --- */
     --background: 24 10% 5%;
+    /* Deep Black/Brown tint */
     --foreground: 60 9.1% 97.8%;
+
+    --card: 20 14% 4%;
+    /* Darker cards */
+    --card-foreground: 60 9.1% 97.8%;
+
+    --popover: 20 14% 4%;
+    --popover-foreground: 60 9.1% 97.8%;
+
     --primary: 142 70% 50%;
+    /* Neon Green */
     --primary-foreground: 144.9 80.4% 10%;
+
+    --secondary: 12 6.5% 15.1%;
+    --secondary-foreground: 60 9.1% 97.8%;
+
+    --muted: 12 6.5% 15.1%;
+    --muted-foreground: 24 5.4% 63.9%;
+
+    --accent: 12 6.5% 15.1%;
+    --accent-foreground: 60 9.1% 97.8%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 60 9.1% 97.8%;
+
+    --border: 12 6.5% 15.1%;
+    --input: 12 6.5% 15.1%;
+    --ring: 142 70% 50%;
   }
 }
 
-/* --- THE LOCKDOWN FIX --- */
-html {
-  height: 100%;
-  overflow: hidden; /* Stops the browser window from scrolling */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
+/* Ensure smooth transition between Light and Dark mode */
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* --- ADD THIS SECTION FOR MOBILE FIXES --- */
+
+html,
 body {
   height: 100%;
   width: 100%;
-  overflow: hidden; /* Stops the 'Rubber Band' bounce */
-  overscroll-behavior: none; /* Crucial for mobile */
+  overflow-x: hidden; /* Prevent side scrolling */
+  overscroll-behavior-y: none; /* Disables "pull-to-refresh" rubber banding */
+  -webkit-tap-highlight-color: transparent; /* Removes blue tap box on mobile */
   margin: 0 !important;
   padding: 0 !important;
-  position: fixed; /* Locks the body in place */
-  inset: 0;
 }
 
-/* This allows ONLY the main app container to scroll */
-#root, 
+/* Ensure the main app container fills the screen exactly */
 body > div:first-child {
   height: 100%;
-  width: 100%;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Handle "Notch" and Safe Areas (iPhone X+) */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Custom Scrollbar for better mobile feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.3);
+  border-radius: 10px;
 }
