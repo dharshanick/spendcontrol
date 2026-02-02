@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCurrency } from "@/hooks/use-currency";
 import { useTransactions } from "@/hooks/use-transactions";
 import {
-    startOfWeek, endOfWeek, eachDayOfInterval, format, isSameDay,
-    startOfMonth, endOfMonth, startOfYear, endOfYear, eachMonthOfInterval
+    startOfWeek, endOfWeek, eachDayOfInterval, format,
+    startOfMonth, endOfMonth, startOfYear, endOfYear, eachMonthOfInterval,
+    parseISO, isValid
 } from "date-fns";
 
 export default function SpendingOverviewChart({ referenceDate }: { referenceDate?: Date }) {
@@ -22,68 +23,64 @@ export default function SpendingOverviewChart({ referenceDate }: { referenceDate
     }, []);
 
     const chartData = useMemo(() => {
-        // ALGORITHM: Always anchor to the current reference date (Today)
         const today = referenceDate || new Date();
-        let data = [];
+        let days: Date[] = [];
+        let dateFormat = "yyyy-MM-dd";
+        let labelFormat = "EEE"; // Default (Mon, Tue)
 
+        // 1. DETERMINE TIME RANGE & INTERVALS
         if (timeRange === "Weekly") {
-            // 1. WEEKLY LOGIC: Monday to Sunday of the CURRENT week
-            // Automatically resets when the new week begins
             const start = startOfWeek(today, { weekStartsOn: 1 });
             const end = endOfWeek(today, { weekStartsOn: 1 });
-            const days = eachDayOfInterval({ start, end });
-
-            data = days.map(day => {
-                const amount = transactions
-                    .filter(t => t.type === 'expense' && isSameDay(new Date(t.date), day))
-                    .reduce((sum, t) => sum + t.amount, 0);
-
-                return {
-                    day: format(day, "EEE"), // Mon, Tue...
-                    fullDate: format(day, "yyyy-MM-dd"),
-                    amount
-                };
-            });
+            days = eachDayOfInterval({ start, end });
+            labelFormat = "EEE"; // Mon
         } else if (timeRange === "Monthly") {
-            // 2. MONTHLY LOGIC: 1st to Last day of CURRENT Month
-            // Automatically resets on the 1st of next month
             const start = startOfMonth(today);
             const end = endOfMonth(today);
-            const days = eachDayOfInterval({ start, end });
-
-            data = days.map(day => {
-                const amount = transactions
-                    .filter(t => t.type === 'expense' && isSameDay(new Date(t.date), day))
-                    .reduce((sum, t) => sum + t.amount, 0);
-                return {
-                    day: format(day, "d"), // 1, 2, 3...
-                    amount
-                };
-            });
+            days = eachDayOfInterval({ start, end });
+            labelFormat = "d"; // 1, 2, 3
         } else {
-            // 3. YEARLY LOGIC: Jan 1 to Dec 31 of CURRENT Year
+            // Yearly
             const start = startOfYear(today);
             const end = endOfYear(today);
-            const months = eachMonthOfInterval({ start, end });
-
-            data = months.map(month => {
-                const amount = transactions
-                    .filter(t =>
-                        t.type === 'expense' &&
-                        new Date(t.date).getMonth() === month.getMonth() &&
-                        new Date(t.date).getFullYear() === month.getFullYear()
-                    )
-                    .reduce((sum, t) => sum + t.amount, 0);
-                return {
-                    day: format(month, "MMM"), // Jan, Feb...
-                    amount
-                };
-            });
+            days = eachMonthOfInterval({ start, end });
+            dateFormat = "yyyy-MM"; // Group by Month
+            labelFormat = "MMM"; // Jan, Feb
         }
 
+        // 2. AGGREGATE DATA (The Fix for Missing Expenses)
+        // Instead of filtering 100 times, we loop once to create a "Sum Map"
+        const expensesMap: Record<string, number> = {};
+
+        transactions.forEach((t) => {
+            if (t.type !== "expense") return;
+
+            // Safely parse date
+            if (!t.date) return;
+            const tDate = typeof t.date === 'string' ? parseISO(t.date) : t.date;
+            if (!isValid(tDate)) return;
+
+            // Generate key (e.g., "2026-01-30" or "2026-01" for yearly)
+            const key = format(tDate, dateFormat);
+
+            expensesMap[key] = (expensesMap[key] || 0) + t.amount;
+        });
+
+        // 3. MAP DAYS TO CHART DATA
+        const data = days.map((day) => {
+            const key = format(day, dateFormat);
+            return {
+                day: format(day, labelFormat),
+                fullDate: key,
+                amount: expensesMap[key] || 0, // Lookup sum or default to 0
+            };
+        });
+
         return data;
+
     }, [transactions, timeRange, referenceDate]);
 
+    // Prevent hydration mismatch
     if (!isMounted) return <div className="col-span-4 h-[250px] w-full bg-muted/5 animate-pulse rounded-xl" />;
 
     return (
@@ -113,9 +110,10 @@ export default function SpendingOverviewChart({ referenceDate }: { referenceDate
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                             <defs>
+                                {/* Fixed Gradient Definition */}
                                 <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" className="stroke-muted/20" vertical={false} />
@@ -124,8 +122,7 @@ export default function SpendingOverviewChart({ referenceDate }: { referenceDate
                                 tickLine={false}
                                 axisLine={false}
                                 tickMargin={10}
-                                interval={timeRange === "Monthly" ? 4 : 0}
-                                padding={{ left: 20, right: 20 }}
+                                interval={timeRange === "Monthly" ? 4 : 0} // Skip ticks on monthly view to prevent crowding
                                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                             />
                             <YAxis
@@ -134,21 +131,21 @@ export default function SpendingOverviewChart({ referenceDate }: { referenceDate
                                 tickFormatter={(value) => `${currencySymbol}${value}`}
                                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                                 width={35}
+                                domain={['auto', 'auto']} // FIX: Allows chart to scale dynamically
                             />
                             <Tooltip
+                                cursor={{ stroke: "hsl(var(--muted-foreground))", strokeWidth: 1, strokeDasharray: "4 4" }}
                                 content={({ active, payload }) => {
                                     if (active && payload && payload.length) {
                                         return (
                                             <div className="rounded-lg border bg-background p-2 shadow-sm">
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[0.65rem] uppercase text-muted-foreground">
-                                                            {payload[0].payload.day}
-                                                        </span>
-                                                        <span className="font-bold text-sm text-foreground">
-                                                            {currencySymbol}{payload[0].value}
-                                                        </span>
-                                                    </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[0.65rem] uppercase text-muted-foreground">
+                                                        {payload[0].payload.fullDate || payload[0].payload.day}
+                                                    </span>
+                                                    <span className="font-bold text-sm text-foreground">
+                                                        {currencySymbol}{payload[0].value}
+                                                    </span>
                                                 </div>
                                             </div>
                                         );
@@ -157,14 +154,13 @@ export default function SpendingOverviewChart({ referenceDate }: { referenceDate
                                 }}
                             />
                             <Area
-                                type="monotone"
+                                type="monotone" // Smooth curve
                                 dataKey="amount"
                                 stroke="hsl(var(--primary))"
                                 strokeWidth={2}
                                 fillOpacity={1}
                                 fill="url(#colorAmount)"
-                                activeDot={{ r: 5, fill: "hsl(var(--primary))", strokeWidth: 0 }}
-                                dot={{ r: 3, fill: "hsl(var(--primary))", strokeWidth: 0 }}
+                                activeDot={{ r: 6, fill: "hsl(var(--primary))", strokeWidth: 2, stroke: "hsl(var(--background))" }}
                             />
                         </AreaChart>
                     </ResponsiveContainer>
