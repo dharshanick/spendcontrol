@@ -16,7 +16,16 @@ export const usePrivacy = create<PrivacyState>()(
         }),
         {
             name: "privacy-storage",
-            storage: createJSONStorage(() => localStorage),
+            storage: createJSONStorage(() => {
+                if (typeof window !== "undefined") {
+                    return localStorage;
+                }
+                return {
+                    getItem: () => null,
+                    setItem: () => { },
+                    removeItem: () => { },
+                };
+            }),
         }
     )
 );

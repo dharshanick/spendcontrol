@@ -37,7 +37,16 @@ export const useBudgets = create<BudgetsState>()(
     }),
     {
       name: "budgets-storage",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => {
+        if (typeof window !== "undefined") {
+          return localStorage;
+        }
+        return {
+          getItem: () => null,
+          setItem: () => { },
+          removeItem: () => { },
+        };
+      }),
     }
   )
 );

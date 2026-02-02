@@ -34,7 +34,16 @@ export const useGame = create<GameState>()(
         }),
         {
             name: "game-storage", // Unique name for local storage
-            storage: createJSONStorage(() => localStorage),
+            storage: createJSONStorage(() => {
+                if (typeof window !== "undefined") {
+                    return localStorage;
+                }
+                return {
+                    getItem: () => null,
+                    setItem: () => { },
+                    removeItem: () => { },
+                };
+            }),
         }
     )
 );
