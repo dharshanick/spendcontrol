@@ -55,7 +55,7 @@ export default function MobileHeader() {
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden fixed top-10 left-4 z-50 h-14 w-14 text-zinc-400 hover:text-white"
+            className="md:hidden fixed top-14 left-4 z-50 h-14 w-14 text-zinc-400 hover:text-white"
           >
             <Menu className="h-10 w-10" />
             <span className="sr-only">Toggle Menu</span>
